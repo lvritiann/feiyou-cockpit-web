@@ -73,13 +73,23 @@ def build_data():
     ms = wb["按月汇总各站"]
     dd = wb["按日汇总"]  # 近30天日变化数据源
 
+    # 探测最新有数据月(块5 含烟草合计行, 1月=col2...12月=col13): 供所有月度数据截断
+    b5_probe = find_row(cd, "块5 ·")
+    r_tob_probe = find_row(cd, "含烟草合计", start=b5_probe)
+    tob12 = [cd.cell(r_tob_probe, 1 + m).value for m in range(1, 13)]
+    LAST_MONTH = 12
+    for m in range(11, -1, -1):
+        if tob12[m] not in (None, ""):
+            LAST_MONTH = m + 1
+            break
+
     b1 = find_row(cd, "块1 ·"); r1 = station_rows(cd, b1)
     b2 = find_row(cd, "块2 ·"); r2 = station_rows(cd, b2)
     b3 = find_row(cd, "块3 ·"); r3 = station_rows(cd, b3)
     b4 = find_row(cd, "块4 ·"); r4 = station_rows(cd, b4)
 
     def monthly(rmap):
-        return {st: [cd.cell(r, 1 + m).value for m in range(1, 13)] for st, r in rmap.items()}
+        return {st: [cd.cell(r, 1 + m).value for m in range(1, LAST_MONTH + 1)] for st, r in rmap.items()}
 
     monthly_data = {
         "tob": monthly(r1), "non": monthly(r2),
@@ -110,12 +120,14 @@ def build_data():
     r_non = find_row(cd, "不含烟草合计", start=b5)
     r_tobm = find_row(cd, "含烟草环比", start=b5)
     r_nonm = find_row(cd, "不含烟草环比", start=b5)
+    # 月份轴截断到最新有数据月(LAST_MONTH)
+    n_m = LAST_MONTH
     company = {
-        "monthLabels": [f"{m}月" for m in range(1, 13)],
-        "tob": [cd.cell(r_tob, 1 + m).value for m in range(1, 13)],
-        "non": [cd.cell(r_non, 1 + m).value for m in range(1, 13)],
-        "tobMom": [cd.cell(r_tobm, 1 + m).value for m in range(1, 13)],
-        "nonMom": [cd.cell(r_nonm, 1 + m).value for m in range(1, 13)],
+        "monthLabels": [f"{m}月" for m in range(1, n_m + 1)],
+        "tob": [cd.cell(r_tob, 1 + m).value for m in range(1, n_m + 1)],
+        "non": [cd.cell(r_non, 1 + m).value for m in range(1, n_m + 1)],
+        "tobMom": [cd.cell(r_tobm, 1 + m).value for m in range(1, n_m + 1)],
+        "nonMom": [cd.cell(r_nonm, 1 + m).value for m in range(1, n_m + 1)],
     }
 
     # ── 分类明细块：按月汇总各站「各站逐月分类明细」(5品类 + 非油合计) ×15站×12月 金额+毛利 ──
@@ -136,8 +148,8 @@ def build_data():
             v = ms.cell(r, 1).value
             if v in STATION_ORDER:
                 st_rows.append((v, r))
-        amt = {name: [ms.cell(r, 1 + m).value for m in range(1, 13)] for name, r in st_rows[:15]}
-        prof = {name: [ms.cell(r, 1 + m).value for m in range(1, 13)] for name, r in st_rows[15:30]}
+        amt = {name: [ms.cell(r, 1 + m).value for m in range(1, LAST_MONTH + 1)] for name, r in st_rows[:15]}
+        prof = {name: [ms.cell(r, 1 + m).value for m in range(1, LAST_MONTH + 1)] for name, r in st_rows[15:30]}
         return amt, prof
 
     ct = cat_titles()
