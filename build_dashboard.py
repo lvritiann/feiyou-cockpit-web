@@ -195,10 +195,10 @@ if (typeof echarts === 'undefined') {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#F7F2EB; --card:#FCFAF6; --ink:#081F5C; --txt:#1b2233; --mut:#5b6478;
-    --faint:#9aa3b5; --grid:#e6e0d6; --line:#ede7dd;
-    --data:#334EAC; --data2:#7096D1; --hero:#081F5C; --accent:#D4A017;
-    --good:#2f7d5b;
+    --bg:#0d1320; --card:#162032; --ink:#eef2ff; --txt:#d7e0f0; --mut:#8fa1c5;
+    --faint:#64748b; --grid:#2b3752; --line:#232f4a;
+    --data:#3b82f6; --data2:#60a5fa; --hero:#3b82f6; --accent:#fbbf24;
+    --good:#34d399;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);font-family:'Inter','Microsoft YaHei','PingFang SC',sans-serif;
@@ -215,7 +215,7 @@ if (typeof echarts === 'undefined') {
     color:var(--mut);font-size:12.5px;cursor:pointer;transition:.18s;user-select:none}
   .chip:hover{border-color:var(--data2);color:var(--data)}
   .chip.active{background:var(--hero);color:#fff;border-color:var(--hero);font-weight:600}
-  .chip.all.active{background:var(--accent);border-color:var(--accent)}
+  .chip.all.active{background:var(--accent);border-color:var(--accent);color:#1e293b}
 
   /* KPI 行 */
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
@@ -241,9 +241,9 @@ if (typeof echarts === 'undefined') {
   .m-chart{width:100%;height:270px}
   .m-table{width:100%;border-collapse:collapse;font-size:12px}
   .m-table th,.m-table td{border:1px solid var(--line);padding:7px 10px;text-align:left}
-  .m-table th{background:#EEF2FB;color:var(--ink);font-weight:600}
+  .m-table th{background:#22304a;color:#eef2ff;font-weight:600}
   .m-table .r{text-align:right}
-  .m-table tr.tot td{background:#FFF6E0;font-weight:700;color:var(--ink)}
+  .m-table tr.tot td{background:#3a3118;font-weight:700;color:#fde68a}
   @media(max-width:760px){.m-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -295,20 +295,20 @@ if (typeof echarts === 'undefined') {
 <script>
 const DATA = __DATA__;
 const CAT_DETAIL = DATA.composition.cats;   // 5 品类（不含非油合计）
-const C = { ink:'#081F5C', txt:'#1b2233', mut:'#5b6478', faint:'#9aa3b5', grid:'#e6e0d6',
-            data:'#334EAC', data2:'#7096D1', hero:'#081F5C', sheet:'#FCFAF6' };
-const PALETTE = ['#334EAC','#7096D1','#9DB8E0','#B9CFEB','#5b7fc4','#86a5d8','#c2d4ee',
-                 '#3f5fa0','#7d9bd0','#a9c1e6','#2f4f8f','#94b0dd','#bcd0ee','#46639c','#88a6d6'];
-const MODAL_PALETTE = ['#081F5C','#334EAC','#7096D1','#B9CFEB','#D4A017','#9DB8E0'];
+const C = { ink:'#eef2ff', txt:'#d7e0f0', mut:'#8fa1c5', faint:'#64748b', grid:'#2b3752',
+            data:'#3b82f6', data2:'#60a5fa', hero:'#ffffff', sheet:'#162032' };
+const PALETTE = ['#ef4444','#3b82f6','#facc15','#06b6d4','#ec4899','#22c55e','#a855f7','#f97316',
+                 '#14b8a6','#eab308','#8b5cf6','#10b981','#f43f5e','#0ea5e9','#d946ef'];
+const MODAL_PALETTE = ['#ef4444','#3b82f6','#facc15','#06b6d4','#ec4899','#a855f7'];
 const fmtW = v => (v==null?'—':(v/10000).toFixed(1)+'万');
 const sum12 = arr => (arr||[]).reduce((a,b)=>a+(b||0),0);
 const charts = [];
 function mk(id, opt){ const el=document.getElementById(id);
   const c=echarts.init(el,null,{renderer:'canvas'}); c.setOption(opt); charts.push(c); return c; }
-const baseTip = {trigger:'axis', backgroundColor:'#081F5C', borderWidth:0, padding:[9,13],
-  textStyle:{color:'#FCFAF6', fontFamily:'Inter', fontSize:12}};
-const tipItem = {trigger:'item', backgroundColor:'#081F5C', borderWidth:0, padding:[9,13],
-  textStyle:{color:'#FCFAF6', fontFamily:'Inter', fontSize:12}};
+const baseTip = {trigger:'axis', backgroundColor:'#ffffff', borderWidth:0, padding:[9,13],
+  textStyle:{color:'#111827', fontFamily:'Inter', fontSize:12}};
+const tipItem = {trigger:'item', backgroundColor:'#ffffff', borderWidth:0, padding:[9,13],
+  textStyle:{color:'#111827', fontFamily:'Inter', fontSize:12}};
 const baseGrid = {left:54,right:22,top:30,bottom:46};
 const cat = d => ({type:'category',data:d,axisLine:{lineStyle:{color:C.grid}},
   axisTick:{show:false}, axisLabel:{color:C.mut,fontSize:11}});
@@ -351,10 +351,10 @@ function renderRank(){
     const st = DATA.stations.slice().sort((a,b)=>b.compTob-a.compTob);
     const names = st.map(s=>s.name), task = st.map(s=>s.yearTask), done = st.map(s=>s.compTob);
     const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
-    mk('c1',{tooltip:baseTip,legend:{data:['年任务','累计完成'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+    mk('c1',{tooltip:baseTip,legend:{data:['年任务','累计完成'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
       grid:baseGrid, xAxis:cat(names), yAxis:val('万元'),
       series:[
-        {name:'年任务',type:'bar',data:task,barWidth:13,itemStyle:{color:'#cfd9ec',borderRadius:[4,4,0,0]}},
+        {name:'年任务',type:'bar',data:task,barWidth:13,itemStyle:{color:'#475569',borderRadius:[4,4,0,0]}},
         {name:'累计完成',type:'bar',data:done,barWidth:13,
           itemStyle:{color:p=>colors[p.dataIndex]!==undefined?colors[p.dataIndex]:C.data,borderRadius:[4,4,0,0]},
           label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>p.value}}
@@ -365,7 +365,7 @@ function renderRank(){
   t.textContent = SEL + ' · 任务进度（年任务 vs 累计完成，万元）';
   mk('c1',{tooltip:baseTip, grid:baseGrid, xAxis:cat(['年任务','累计完成']), yAxis:val('万元'),
     series:[{type:'bar',data:[s.yearTask, s.compTob],barWidth:44,
-      itemStyle:{color:p=>p.dataIndex===0?'#cfd9ec':C.hero,borderRadius:[4,4,0,0]},
+      itemStyle:{color:p=>p.dataIndex===0?'#475569':C.hero,borderRadius:[4,4,0,0]},
       label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>p.value}}]});
 }
 // ---------- 图2 完成率（公司=排行；选中站=含/不含烟草对比） ----------
@@ -416,7 +416,7 @@ function renderCompany(){
   if(SEL === '全公司'){
     t.textContent = '全公司月度非油金额与环比（含烟草）';
     const c = DATA.company;
-    mk('c4',{tooltip:baseTip, legend:{data:['含烟草金额','含烟草环比'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+    mk('c4',{tooltip:baseTip, legend:{data:['含烟草金额','含烟草环比'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
       grid:Object.assign({},baseGrid,{right:56}), xAxis:cat(months),
       yAxis:[val('元'),{type:'value',name:'环比',nameTextStyle:{color:C.mut,fontSize:10},
         axisLine:{show:false},splitLine:{show:false},axisLabel:{color:C.mut,fontSize:11,formatter:v=>(v*100).toFixed(0)+'%'}}],
@@ -430,7 +430,7 @@ function renderCompany(){
   t.textContent = SEL + ' · 月度非油金额与环比（含烟草）';
   const arr = DATA.monthly.tob[SEL] || [];
   const mom = arr.map((v,i)=>{ if(i===0) return null; const p=arr[i-1]; if(!p) return null; return (v-p)/p; });
-  mk('c4',{tooltip:baseTip, legend:{data:['月度金额','环比'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+  mk('c4',{tooltip:baseTip, legend:{data:['月度金额','环比'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
     grid:Object.assign({},baseGrid,{right:56}), xAxis:cat(months),
     yAxis:[val('元'),{type:'value',name:'环比',nameTextStyle:{color:C.mut,fontSize:10},
       axisLine:{show:false},splitLine:{show:false},axisLabel:{color:C.mut,fontSize:11,formatter:v=>v==null?'':(v*100).toFixed(0)+'%'}}],
@@ -452,7 +452,7 @@ function renderComp(){
     names = CAT_DETAIL;
     vals = CAT_DETAIL.map(c=> Math.round(sum12(DATA.categoryDetail.amount[c][SEL])/1e2)/100);
   }
-  mk('c5',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#141d38',fontSize:12,fontWeight:600}},
+  mk('c5',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}},
     color:MODAL_PALETTE,
     series:[{type:'pie',radius:['42%','68%'],center:['62%','54%'],
       label:{color:C.txt,fontSize:11,formatter:'{b}\n{c}万'},
@@ -473,7 +473,7 @@ function renderDual(){
       non:[ Math.round(sum12(m.non[SEL])/1e2)/100, Math.round(sum12(m.nonProfit[SEL])/1e2)/100 ],
       tob:[ Math.round(sum12(m.tob[SEL])/1e2)/100, Math.round(sum12(m.tobProfit[SEL])/1e2)/100 ]};
   }
-  mk('c6',{tooltip:baseTip, legend:{data:['不含烟草','含烟草'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+  mk('c6',{tooltip:baseTip, legend:{data:['不含烟草','含烟草'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
     grid:baseGrid, xAxis:cat(d.cats), yAxis:val('万元'),
     series:[
       {name:'不含烟草',type:'bar',data:d.non,barWidth:34,itemStyle:{color:C.data2,borderRadius:[4,4,0,0]}},
@@ -514,18 +514,18 @@ function renderDetail(){
       prof[c] = DATA.categoryDetail.profit[c][SEL]  || [];
     }
   }
-  mk('dAmt',{tooltip:baseTip, legend:{textStyle:{color:'#141d38',fontSize:12,fontWeight:600}, top:6},
+  mk('dAmt',{tooltip:baseTip, legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6},
     grid:{left:54,right:22,top:38,bottom:46},
     xAxis:cat(months), yAxis:val('元'),
     series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'a',data:amt[c],barMaxWidth:24,
       itemStyle:{color:MODAL_PALETTE[i]}}))});
-  mk('dProf',{tooltip:baseTip, legend:{textStyle:{color:'#141d38',fontSize:12,fontWeight:600}, top:6},
+  mk('dProf',{tooltip:baseTip, legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6},
     grid:{left:54,right:22,top:38,bottom:46},
     xAxis:cat(months), yAxis:val('元'),
     series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'p',data:prof[c],barMaxWidth:24,
       itemStyle:{color:MODAL_PALETTE[i]}}))});
   const vals = CAT_DETAIL.map(c => Math.round(sum12(amt[c])/1e2)/100);
-  mk('dPie',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#141d38',fontSize:12,fontWeight:600}},
+  mk('dPie',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}},
     color:MODAL_PALETTE,
     series:[{type:'pie',radius:['40%','66%'],center:['58%','54%'],
       label:{color:C.txt,fontSize:11,formatter:'{b}\n{c}万'},
