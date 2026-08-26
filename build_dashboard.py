@@ -71,6 +71,7 @@ def build_data():
     wb = load_excel()
     cd = wb["图表数据源"]
     ms = wb["按月汇总各站"]
+    dd = wb["按日汇总"]  # 近30天日变化数据源
 
     b1 = find_row(cd, "块1 ·"); r1 = station_rows(cd, b1)
     b2 = find_row(cd, "块2 ·"); r2 = station_rows(cd, b2)
@@ -84,6 +85,9 @@ def build_data():
         "tob": monthly(r1), "non": monthly(r2),
         "tobProfit": monthly(r3), "nonProfit": monthly(r4),
     }
+
+    # ── 近30天日变化: 读「按日汇总」每站每日 金额(col2-16)+毛利(col18-32) + 合计(col17/33) ──
+    daily30 = build_daily30(dd)
 
     # 块6: 各站年任务与累计完成(万元)
     b6 = find_row(cd, "块6 ·")
@@ -180,7 +184,50 @@ def build_data():
         "dual": dual,
         "totals": totals,
         "forecast": forecast,
+        "daily30": daily30,
     }
+
+
+def build_daily30(ws):
+    """读「按日汇总」近30天(截至最新有数据日) 每站每日 金额/毛利 + 公司合计。
+    ws: 「按日汇总」sheet。列结构(1-based): 1=日期, 2-16=15站金额, 17=金额合计,
+       18-32=15站毛利, 33=毛利合计, 45=辅助日期。
+    """
+    import datetime as _dt
+    # 找最新有数据的日期行(金额合计>0)
+    rows = []
+    for r in range(4, ws.max_row + 1):
+        d = ws.cell(r, 1).value
+        if not isinstance(d, (_dt.datetime, _dt.date)):
+            continue
+        amt_total = ws.cell(r, 17).value
+        if isinstance(amt_total, (int, float)) and amt_total > 0:
+            rows.append(r)
+    if not rows:
+        return {"dates": [], "amount": {}, "profit": {}}
+    end_r = rows[-1]
+    start_r = rows[-30] if len(rows) >= 30 else rows[0]
+
+    dates, amount, profit = [], {}, {}
+    for i, st in enumerate(STATION_ORDER):
+        amount[st] = []
+        profit[st] = []
+    amount["合计"] = []
+    profit["合计"] = []
+    for r in range(start_r, end_r + 1):
+        d = ws.cell(r, 1).value
+        if isinstance(d, _dt.datetime):
+            dates.append(d.strftime("%m-%d"))
+        elif isinstance(d, _dt.date):
+            dates.append(d.strftime("%m-%d"))
+        else:
+            dates.append("")
+        for i, st in enumerate(STATION_ORDER):
+            amount[st].append(ws.cell(r, 2 + i).value)
+            profit[st].append(ws.cell(r, 18 + i).value)
+        amount["合计"].append(ws.cell(r, 17).value)
+        profit["合计"].append(ws.cell(r, 33).value)
+    return {"dates": dates, "amount": amount, "profit": profit}
 
 
 def build_forecast(wb):
@@ -380,6 +427,10 @@ if (typeof echarts === 'undefined') {
       <div class="sub">累计完成 ÷ 年任务 · 深色=当前选中站</div><div id="c2" class="chart"></div></div>
     <div class="card wide"><h3 id="t3">各站分会计月销售趋势（含烟草金额）</h3>
       <div class="sub">元 · 选中单站时该站加粗高亮、其余淡显；选「全公司」则均衡展示</div><div id="c3" class="chart tall"></div></div>
+    <div class="card wide"><h3 id="t7">近30天日变化 · 非油销售额（含烟草）</h3>
+      <div class="sub">元/日 · 最新30天 · 选「全公司」看公司合计，选中站看该站</div><div id="c7" class="chart"></div></div>
+    <div class="card wide"><h3 id="t8">近30天日变化 · 非油毛利（含烟草）</h3>
+      <div class="sub">元/日 · 最新30天 · 选「全公司」看公司合计，选中站看该站</div><div id="c8" class="chart"></div></div>
     <div class="card wide"><h3 id="t4">全公司月度非油金额与环比（含烟草）</h3>
       <div class="sub">柱=月度金额(元) · 线=环比(%)</div><div id="c4" class="chart"></div></div>
     <div class="card"><h3 id="t5">金额构成（含烟草 · 年度累计，万元）</h3>
@@ -618,6 +669,43 @@ function renderDual(){
     ]});
 }
 
+// ---------- 近30天日变化(联动) ----------
+function renderDaily30(){
+  const d = DATA.daily30 || {dates:[], amount:{}, profit:{}};
+  if(!d.dates.length){ return; }
+  const key = SEL === '全公司' ? '合计' : SEL;
+  const amtArr = d.amount[key] || [];
+  const profArr = d.profit[key] || [];
+  const t7 = document.getElementById('t7');
+  const t8 = document.getElementById('t8');
+  t7.textContent = '近30天日变化 · 非油销售额（含烟草）' + (SEL==='全公司' ? '' : ' · ' + SEL);
+  t8.textContent = '近30天日变化 · 非油毛利（含烟草）' + (SEL==='全公司' ? '' : ' · ' + SEL);
+  // 7日均线
+  const ma7 = arr => arr.map((_,i)=>{
+    if(i<6) return null;
+    let s=0; for(let j=i-6;j<=i;j++) s+=(arr[j]||0);
+    return Math.round(s/7*100)/100;
+  });
+  const mkDaily = (id, arr, color) => {
+    mk(id,{tooltip:{...baseTip,formatter:ps=>{
+        const p=ps[0]; let html=p.name+'<br>';
+        ps.forEach(x=>{ html+=x.marker+x.seriesName+'：'+fmt2(x.value==null?0:x.value)+' 元<br>'; });
+        return html;
+      }},
+      legend:{data:['日值','7日均线'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
+      grid:{left:70,right:26,top:34,bottom:46}, xAxis:cat(d.dates),
+      yAxis:val('元'),
+      series:[
+        {name:'日值',type:'line',smooth:true,symbol:'circle',symbolSize:4,data:arr,
+          lineStyle:{width:2,color:color},itemStyle:{color:color},areaStyle:{color:color,opacity:0.08}},
+        {name:'7日均线',type:'line',smooth:true,symbol:'none',data:ma7(arr),
+          lineStyle:{width:1.6,color:'#fbbf24',type:'dashed'},itemStyle:{color:'#fbbf24'}}
+      ]});
+  };
+  mkDaily('c7', amtArr, C.data);
+  mkDaily('c8', profArr, C.data2);
+}
+
 // ---------- 品类明细（内嵌到主页，4 块：金额堆叠/毛利堆叠/构成饼/合计表） ----------
 function renderDetail(){
   const isCo = SEL === '全公司';
@@ -675,7 +763,7 @@ function renderDetail(){
 // ---------- 渲染总入口 ----------
 function renderAll(){
   charts.forEach(c=>c.dispose()); charts.length=0;
-  renderKPI(); renderRank(); renderRate(); renderTrend(); renderCompany(); renderComp(); renderDual();
+  renderKPI(); renderRank(); renderRate(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
   renderDetail();
   document.getElementById('upd').textContent = '数据生成于 ' + DATA.generatedAt + ' · 当前视角：' + SEL;
 }
