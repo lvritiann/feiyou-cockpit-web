@@ -314,7 +314,7 @@ HTML = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>非油销售汇总驾驶舱 · 图表视图</title>
+<title>陕西高速延长石油有限责任公司非油销售汇总驾驶舱 · 图表视图</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script>
 if (typeof echarts === 'undefined') {
@@ -337,6 +337,7 @@ if (typeof echarts === 'undefined') {
   header{margin-bottom:18px}
   header h1{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
   header p{color:var(--mut);font-size:12.5px;margin-top:5px}
+  header p.byline{color:var(--faint);font-size:11px;margin-top:3px}
   .upd{color:var(--faint);font-size:11px;margin-top:2px}
 
   /* 联动站点选择器 */
@@ -404,8 +405,9 @@ if (typeof echarts === 'undefined') {
 <body>
 <div class="wrap">
   <header>
-    <h1>非油销售汇总驾驶舱 · 图表视图</h1>
+    <h1>陕西高速延长石油有限责任公司非油销售汇总驾驶舱 · 图表视图</h1>
     <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
+    <p class="byline">Design by 刘龙伟 · Email: liulongwei@126.com</p>
     <div class="upd" id="upd"></div>
   </header>
 
@@ -470,10 +472,6 @@ if (typeof echarts === 'undefined') {
     </div>
   </div>
 
-  <footer>
-    本页为静态快照，数据由 build_dashboard.py 从驾驶舱 Excel 生成；每日 10:00（北京时间）由 GitHub Action 自动重算刷新。<br>
-    联动仅影响展示视角，不改变任一数据源。点击站点标签切换视角，品类明细同步更新。
-  </footer>
 </div>
 
 <script>
