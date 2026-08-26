@@ -95,12 +95,11 @@ if (typeof echarts === 'undefined') {
 
   <div class="card wide" style="margin-top:14px">
     <h3 id="detailTitle">品类构成与明细</h3>
-    <div class="sub" id="detailSub" style="margin-bottom:10px">5 品类 × 12 会计月 金额/毛利堆叠、年度构成、合计表</div>
+    <div class="sub" id="detailSub" style="margin-bottom:10px">5 品类 × 12 会计月 金额/毛利堆叠、合计表（品类构成见上方「金额构成」卡）</div>
     <div class="m-grid">
       <div class="m-card"><h4 id="dAmtH">品类 × 12 月 金额（元）</h4><div id="dAmt" class="m-chart" style="height:280px"></div></div>
       <div class="m-card"><h4 id="dProfH">品类 × 12 月 毛利（元）</h4><div id="dProf" class="m-chart" style="height:280px"></div></div>
-      <div class="m-card"><h4>年度构成（万元）</h4><div id="dPie" class="m-chart" style="height:280px"></div></div>
-      <div class="m-card"><h4>金额/毛利年度合计</h4>
+      <div class="m-card" style="grid-column:1/-1"><h4>金额 / 毛利 年度合计（万元）</h4>
         <div style="overflow:auto"><table class="m-table" id="dTable"></table></div></div>
     </div>
   </div>
@@ -119,15 +118,19 @@ const C = { ink:'#eef2ff', txt:'#d7e0f0', mut:'#8fa1c5', faint:'#64748b', grid:'
 const PALETTE = ['#ef4444','#3b82f6','#facc15','#06b6d4','#ec4899','#22c55e','#a855f7','#f97316',
                  '#14b8a6','#eab308','#8b5cf6','#10b981','#f43f5e','#0ea5e9','#d946ef'];
 const MODAL_PALETTE = ['#ef4444','#3b82f6','#facc15','#06b6d4','#ec4899','#a855f7'];
-const fmtW = v => (v==null?'—':(v/10000).toFixed(1)+'万');
+const fmtW = v => (v==null?'—':(v/10000).toFixed(2)+'万');
 const sum12 = arr => (arr||[]).reduce((a,b)=>a+(b||0),0);
 const charts = [];
 function mk(id, opt){ const el=document.getElementById(id);
   const c=echarts.init(el,null,{renderer:'canvas'}); c.setOption(opt); charts.push(c); return c; }
+const num2 = v => (typeof v === 'number') ? Number(v.toFixed(2)) : v;   // 图表数字统一保留两位小数
+const fmt2 = v => (typeof v === 'number') ? v.toLocaleString('zh-CN',{minimumFractionDigits:2, maximumFractionDigits:2}) : v; // 千分位+两位小数
 const baseTip = {trigger:'axis', backgroundColor:'#ffffff', borderWidth:0, padding:[9,13],
-  textStyle:{color:'#111827', fontFamily:'Inter', fontSize:12}};
+  textStyle:{color:'#111827', fontFamily:'Inter', fontSize:12},
+  valueFormatter: v => Array.isArray(v) ? v.map(num2) : num2(v)};
 const tipItem = {trigger:'item', backgroundColor:'#ffffff', borderWidth:0, padding:[9,13],
-  textStyle:{color:'#111827', fontFamily:'Inter', fontSize:12}};
+  textStyle:{color:'#111827', fontFamily:'Inter', fontSize:12},
+  valueFormatter: v => num2(v)};
 const baseGrid = {left:54,right:22,top:30,bottom:46};
 const cat = d => ({type:'category',data:d,axisLine:{lineStyle:{color:C.grid}},
   axisTick:{show:false}, axisLabel:{color:C.mut,fontSize:11}});
@@ -145,16 +148,16 @@ function renderKPI(){
   const profit = stObj ? Math.round(sum12(DATA.monthly.tobProfit[SEL])/1e2)/100 : t.tobProfit;
   const profRate = stObj ? (comp ? profit/comp*100 : 0) : (t.tobProfit/t.tobAmount*100);
   const yearTask  = stObj ? stObj.yearTask : task;
-  const subt1 = stObj ? `年任务 ${yearTask}万 · 进度 ${rate.toFixed(1)}%`
-                       : `全年任务 ${task}万 · 进度 ${(t.tobAmount/task*100).toFixed(1)}%`;
+  const subt1 = stObj ? `年任务 ${yearTask}万 · 进度 ${rate.toFixed(2)}%`
+                       : `全年任务 ${task}万 · 进度 ${(t.tobAmount/task*100).toFixed(2)}%`;
   const cards = [
     {k: stObj ? '本站累计完成(含烟草)' : '累计完成(含烟草)',
-      v: comp==null?'—':comp.toFixed(1), u:'万', s: subt1},
-    {k: '完成率(含烟草)', v: rate==null?'—':rate.toFixed(1), u:'%',
-      s: rate>=100 ? '已达标 ✔' : ((100-rate).toFixed(1)+'% 待完成')},
+      v: comp==null?'—':comp.toFixed(2), u:'万', s: subt1},
+    {k: '完成率(含烟草)', v: rate==null?'—':rate.toFixed(2), u:'%',
+      s: rate>=100 ? '已达标 ✔' : ((100-rate).toFixed(2)+'% 待完成')},
     {k: stObj ? '本站累计毛利(含烟草)' : '累计毛利(含烟草)',
-      v: profit==null?'—':profit.toFixed(1), u:'万',
-      s: '毛利率 ' + profRate.toFixed(1) + '%'},
+      v: profit==null?'—':profit.toFixed(2), u:'万',
+      s: '毛利率 ' + profRate.toFixed(2) + '%'},
     {k: stObj ? '本站年任务' : '全年任务',
       v: yearTask, u:'万', s: stObj ? '本站任务盘（不含烟草去化）' : '烟草去化已计入'},
   ];
@@ -176,7 +179,7 @@ function renderRank(){
         {name:'年任务',type:'bar',data:task,barWidth:13,itemStyle:{color:'#475569',borderRadius:[4,4,0,0]}},
         {name:'累计完成',type:'bar',data:done,barWidth:13,
           itemStyle:{color:p=>colors[p.dataIndex]!==undefined?colors[p.dataIndex]:C.data,borderRadius:[4,4,0,0]},
-          label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>p.value}}
+          label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>Number(p.value).toFixed(2)}}
       ]});
     return;
   }
@@ -185,7 +188,7 @@ function renderRank(){
   mk('c1',{tooltip:baseTip, grid:baseGrid, xAxis:cat(['年任务','累计完成']), yAxis:val('万元'),
     series:[{type:'bar',data:[s.yearTask, s.compTob],barWidth:44,
       itemStyle:{color:p=>p.dataIndex===0?'#475569':C.hero,borderRadius:[4,4,0,0]},
-      label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>p.value}}]});
+      label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>Number(p.value).toFixed(2)}}]});
 }
 // ---------- 图2 完成率（公司=排行；选中站=含/不含烟草对比） ----------
 function renderRate(){
@@ -194,21 +197,21 @@ function renderRate(){
     t.textContent = '各站任务完成率（含烟草）';
     const st = DATA.stations.slice().sort((a,b)=>b.rateTob-a.rateTob);
     const names = st.map(s=>s.name);
-    const rate = st.map(s=>+(s.rateTob*100).toFixed(1));
+    const rate = st.map(s=>+(s.rateTob*100).toFixed(2));
     const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
-    mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+p[0].value+'%'},grid:baseGrid,
+    mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+Number(p[0].value).toFixed(2)+'%'},grid:baseGrid,
       xAxis:cat(names), yAxis:val('完成率',v=>v+'%'),
       series:[{type:'bar',data:rate.map((v,i)=>({value:v,itemStyle:{color:colors[i],borderRadius:[4,4,0,0]}})),
-        barWidth:18, label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>p.value+'%'}}]});
+        barWidth:18, label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>Number(p.value).toFixed(2)+'%'}}]});
     return;
   }
   const s = DATA.stations.find(x=>x.name===SEL);
   t.textContent = SEL + ' · 完成率（含烟草 vs 不含烟草）';
-  mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+p[0].value+'%'},grid:baseGrid,
+  mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+Number(p[0].value).toFixed(2)+'%'},grid:baseGrid,
     xAxis:cat(['含烟草','不含烟草']), yAxis:val('完成率',v=>v+'%'),
-    series:[{type:'bar',data:[+(s.rateTob*100).toFixed(1), +(s.rateNon*100).toFixed(1)],barWidth:44,
+    series:[{type:'bar',data:[+(s.rateTob*100).toFixed(2), +(s.rateNon*100).toFixed(2)],barWidth:44,
       itemStyle:{color:p=>p.dataIndex===0?C.hero:C.data2,borderRadius:[4,4,0,0]},
-      label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>p.value+'%'}}]});
+      label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>Number(p.value).toFixed(2)+'%'}}]});
 }
 // ---------- 图3 趋势(联动) ----------
 function renderTrend(){
@@ -343,22 +346,15 @@ function renderDetail(){
     xAxis:cat(months), yAxis:val('元'),
     series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'p',data:prof[c],barMaxWidth:24,
       itemStyle:{color:MODAL_PALETTE[i]}}))});
-  const vals = CAT_DETAIL.map(c => Math.round(sum12(amt[c])/1e2)/100);
-  mk('dPie',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}},
-    color:MODAL_PALETTE,
-    series:[{type:'pie',radius:['40%','66%'],center:['58%','54%'],
-      label:{color:C.txt,fontSize:11,formatter:'{b}\n{c}万'},
-      labelLine:{lineStyle:{color:C.faint}},
-      data:CAT_DETAIL.map((n,i)=>({name:n,value:vals[i]}))}]});
   const rows = CAT_DETAIL.map(c=>{
     const a = Math.round(sum12(amt[c])/1e2)/100, p = Math.round(sum12(prof[c])/1e2)/100;
-    return `<tr><td>${c}</td><td class="r">${a.toLocaleString()}</td><td class="r">${p.toLocaleString()}</td></tr>`;
+    return `<tr><td>${c}</td><td class="r">${fmt2(a)}</td><td class="r">${fmt2(p)}</td></tr>`;
   }).join('');
   const ta = Math.round(CAT_DETAIL.reduce((s,c)=>s+sum12(amt[c]),0)/1e2)/100;
   const tp = Math.round(CAT_DETAIL.reduce((s,c)=>s+sum12(prof[c]),0)/1e2)/100;
   document.getElementById('dTable').innerHTML =
     `<tr><th>品类</th><th>金额（万元）</th><th>毛利（万元）</th></tr>` + rows +
-    `<tr class="tot"><td>合计</td><td class="r">${ta.toLocaleString()}</td><td class="r">${tp.toLocaleString()}</td></tr>`;
+    `<tr class="tot"><td>合计</td><td class="r">${fmt2(ta)}</td><td class="r">${fmt2(tp)}</td></tr>`;
 }
 
 // ---------- 渲染总入口 ----------
