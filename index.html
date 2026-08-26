@@ -116,6 +116,10 @@ if (typeof echarts === 'undefined') {
       <div class="sub">万元 · 深色=当前选中站 · 点击柱体可切换选中并查看明细</div><div id="c1" class="chart"></div></div>
     <div class="card"><h3 id="t2">各站任务完成率（含烟草）</h3>
       <div class="sub">累计完成 ÷ 年任务 · 深色=当前选中站</div><div id="c2" class="chart"></div></div>
+    <div class="card"><h3 id="t9">毛利贡献额排名（含烟草 · 年度累计）</h3>
+      <div class="sub">万元 · 各站累计毛利降序</div><div id="c9" class="chart"></div></div>
+    <div class="card"><h3 id="t10">毛利率排名（含烟草 · 年度累计）</h3>
+      <div class="sub">% · 各站累计毛利率降序 · 红线=23.5% 公司红线</div><div id="c10" class="chart"></div></div>
     <div class="card wide"><h3 id="t3">各站分会计月销售趋势（含烟草金额）</h3>
       <div class="sub">元 · 选中单站时该站加粗高亮、其余淡显；选「全公司」则均衡展示</div><div id="c3" class="chart tall"></div></div>
     <div class="card wide"><h3 id="t7">近30天日变化 · 非油销售额（含烟草）</h3>
@@ -393,6 +397,47 @@ function renderDaily30(){
   mkDaily('c8', profArr, C.data2);
 }
 
+// ---------- 毛利贡献额 / 毛利率 排名榜(公司视角,横向条形) ----------
+function renderRank2(){
+  const prof = DATA.stations.map(s=>({
+    name:s.name,
+    amt: Math.round(sum12(DATA.monthly.tob[s.name])/1e2)/100,          // 万元
+    profit: Math.round(sum12(DATA.monthly.tobProfit[s.name])/1e2)/100, // 万元
+  }));
+  prof.forEach(p=>{ p.rate = p.amt ? +(p.profit/p.amt*100).toFixed(2) : 0; });
+  const byProfit = prof.slice().sort((a,b)=>b.profit-a.profit);
+  const byRate   = prof.slice().sort((a,b)=>b.rate-a.rate);
+
+  // 毛利贡献额榜(横向)
+  mk('c9',{tooltip:{...tipItem,valueFormatter:v=>num2(v)+' 万'},
+    grid:{left:70,right:44,top:16,bottom:26},
+    xAxis:{type:'value',axisLine:{show:false},splitLine:{lineStyle:{color:C.grid}},
+      axisLabel:{color:C.mut,fontSize:11,formatter:v=>v+'万'}},
+    yAxis:{type:'category',inverse:true,data:byProfit.map(x=>x.name),
+      axisLine:{show:false},axisTick:{show:false},axisLabel:{color:C.txt,fontSize:11.5}},
+    series:[{type:'bar',data:byProfit.map((x,i)=>({
+        value:x.profit, itemStyle:{color:i===0?'#fbbf24':(i===1?'#60a5fa':'#3b82f6'),
+          borderRadius:[0,4,4,0]}})),
+      barWidth:16,
+      label:{show:true,position:'right',color:C.txt,fontSize:10.5,formatter:p=>num2(p.value)+'万'}}]});
+
+  // 毛利率榜(横向 + 23.5%红线)
+  mk('c10',{tooltip:{...tipItem,valueFormatter:v=>num2(v)+'%'},
+    grid:{left:70,right:44,top:16,bottom:26},
+    xAxis:{type:'value',axisLine:{show:false},splitLine:{lineStyle:{color:C.grid}},
+      axisLabel:{color:C.mut,fontSize:11,formatter:v=>v+'%'},
+      max: Math.max(...byRate.map(x=>x.rate), 23.5)*1.12},
+    yAxis:{type:'category',inverse:true,data:byRate.map(x=>x.name),
+      axisLine:{show:false},axisTick:{show:false},axisLabel:{color:C.txt,fontSize:11.5}},
+    series:[{type:'bar',data:byRate.map((x,i)=>({
+        value:x.rate,
+        itemStyle:{color: x.rate>=23.5 ? '#34d399' : '#ef4444', borderRadius:[0,4,4,0]}})),
+      barWidth:16,
+      label:{show:true,position:'right',color:C.txt,fontSize:10.5,formatter:p=>num2(p.value)+'%'},
+      markLine:{symbol:'none',data:[{xAxis:23.5,lineStyle:{color:'#fbbf24',type:'dashed',width:1.5},
+        label:{formatter:'红线 23.5%',color:'#fbbf24',fontSize:10,position:'end'}}]}}]});
+}
+
 // ---------- 品类明细（内嵌到主页，4 块：金额堆叠/毛利堆叠/构成饼/合计表） ----------
 function renderDetail(){
   const isCo = SEL === '全公司';
@@ -450,7 +495,7 @@ function renderDetail(){
 // ---------- 渲染总入口 ----------
 function renderAll(){
   charts.forEach(c=>c.dispose()); charts.length=0;
-  renderKPI(); renderRank(); renderRate(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
+  renderKPI(); renderRank(); renderRate(); renderRank2(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
   renderDetail();
   document.getElementById('upd').textContent = '数据生成于 ' + DATA.generatedAt + ' · 当前视角：' + SEL;
 }
