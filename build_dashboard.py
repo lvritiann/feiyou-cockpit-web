@@ -166,6 +166,9 @@ def build_data():
         "non": [totals["nonAmount"], totals["nonProfit"]],
     }
 
+    # ── 预测模型(目标达成短信) → forecast 节点 ──
+    forecast = build_forecast(wb)
+
     return {
         "generatedAt": datetime.date.today().isoformat(),
         "taskTotal": TASK_TOTAL,
@@ -176,6 +179,86 @@ def build_data():
         "categoryDetail": category_detail,
         "dual": dual,
         "totals": totals,
+        "forecast": forecast,
+    }
+
+
+def build_forecast(wb):
+    """读取「预测模型」Sheet 参数 + 「目标达成」Sheet 预测短信，供『预测』标签页使用。"""
+    pm = wb["预测模型"]
+    L = {}
+    for r in range(1, pm.max_row + 1):
+        a = pm.cell(r, 1).value
+        if isinstance(a, str) and a.strip():
+            L[a.strip()] = pm.cell(r, 2).value
+
+    def numv(k):
+        v = L.get(k)
+        try:
+            return None if v is None else round(float(v), 4)
+        except (TypeError, ValueError):
+            return None
+
+    # 短信正文:「目标达成」找到标题行后, 正文在下一行 A 列(或本行 B 列)
+    sms = ""
+    da = wb["目标达成"]
+    for r in range(1, da.max_row + 1):
+        a = da.cell(r, 1).value
+        if isinstance(a, str) and "【每日销量预测短信】" in a:
+            for cand in (da.cell(r + 1, 1).value, da.cell(r, 2).value):
+                if isinstance(cand, str) and len(cand) > 50:
+                    sms = cand.strip()
+                    break
+            break
+
+    as_of = L.get("截至日期")
+    if hasattr(as_of, "strftime"):
+        as_of = as_of.strftime("%Y-%m-%d")
+    pred_end = L.get("预测截止")
+    if hasattr(pred_end, "strftime"):
+        pred_end = pred_end.strftime("%Y-%m-%d")
+    huashan = L.get("华山停业起")
+    if hasattr(huashan, "strftime"):
+        huashan = huashan.strftime("%Y-%m-%d")
+
+    # 超额% 存的是小数(0.1956), 转成百分比数(19.56)
+    def pct(v):
+        return None if v is None else round(float(v) * 100, 2)
+
+    # 模型里 毛利率/红线 已是小数形式(0.2408=24.08%), 直接乘100显示
+    def pct100(v):
+        return None if v is None else round(float(v) * 100, 2)
+
+    return {
+        "asOf": as_of,
+        "predEnd": pred_end,
+        "huashanFrom": huashan,
+        "remainingMonths": numv("剩余月数"),
+        "task": numv("全年任务万") or TASK_TOTAL,
+        "kpis": {
+            "累计含去化销售额万": numv("累计含去化销售额万"),
+            "自然口径累计万": numv("自然口径累计万"),
+            "整体毛利率": pct100(numv("整体毛利率")),
+            "华山扣除万": numv("华山扣除万"),
+        },
+        "scenarios": {
+            "labels": ["全年烟草去化", "剩余可去化", "全口径全年", "公司整体毛利", "期末香烟库存"],
+            "A": [numv("X_A最大去化万(23.5%)"), numv("剩余可去化A万"), numv("全口径A万"),
+                  numv("公司毛利A万"), numv("期末库存A万(23.5%)")],
+            "B": [numv("X_B最大去化万(24%)"), numv("剩余可去化B万"), numv("全口径B万"),
+                  numv("公司毛利B万"), numv("期末库存B万(24%)")],
+        },
+        "overrun": {"A": pct(numv("超额A%")), "B": pct(numv("超额B%"))},
+        "extra": {
+            "当前香烟库存万": numv("当前库存万"),
+            "库存约束去化上限万": numv("库存约束去化上限X_cap万"),
+            "库存是否封顶": numv("库存是否封顶(1=是,0=否)"),
+            "剩余购进万": numv("剩余购进万"),
+            "自然毛利率": pct100(numv("自然毛利率")),
+            "红线A": pct100(numv("公司整体毛利红线A")),
+            "红线B": pct100(numv("红线B")),
+        },
+        "sms": sms,
     }
 
 
@@ -245,6 +328,30 @@ if (typeof echarts === 'undefined') {
   .m-table .r{text-align:right}
   .m-table tr.tot td{background:#3a3118;font-weight:700;color:#fde68a}
   @media(max-width:760px){.m-grid{grid-template-columns:1fr}}
+
+  /* 标签页 */
+  .tabs{display:flex;gap:6px;margin:14px 0 4px;border-bottom:1px solid var(--line);padding-bottom:10px}
+  .tab{padding:8px 22px;border-radius:10px;cursor:pointer;font-size:13.5px;font-weight:600;
+    color:var(--mut);background:var(--card);border:1px solid var(--line);transition:.18s;user-select:none}
+  .tab:hover{color:var(--data)}
+  .tab.active{background:var(--hero);color:#fff;border-color:var(--hero)}
+  .tab.active.fc{background:var(--accent);border-color:var(--accent);color:#1e293b}
+  .view{display:none}
+  .view.active{display:block}
+
+  /* 预测页 */
+  .fc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:16px 0}
+  @media(max-width:980px){.fc-kpis{grid-template-columns:repeat(2,1fr)}}
+  .fc-kpi{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px}
+  .fc-kpi .k{font-size:12px;color:var(--mut);font-weight:500}
+  .fc-kpi .v{font-size:25px;font-weight:800;color:var(--ink);margin-top:6px;letter-spacing:-.02em}
+  .fc-kpi .v small{font-size:13px;font-weight:600;color:var(--mut);margin-left:3px}
+  .fc-kpi .s{font-size:11.5px;color:var(--mut);margin-top:3px}
+  .sms-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-top:14px}
+  .sms-card h3{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:10px;padding-left:8px;border-left:3px solid var(--accent)}
+  .sms-card .sms{font-size:12.8px;color:var(--txt);line-height:1.9;white-space:pre-wrap}
+  .sms-card .sms b{color:var(--accent);font-weight:700}
+  .note{font-size:11px;color:var(--faint);margin-top:8px;line-height:1.7}
 </style>
 </head>
 <body>
@@ -255,6 +362,13 @@ if (typeof echarts === 'undefined') {
     <div class="upd" id="upd"></div>
   </header>
 
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-view="overview">总览</div>
+    <div class="tab fc" data-view="forecast">预测</div>
+  </div>
+
+  <!-- ═══ 总览视图 ═══ -->
+  <div class="view active" id="view-overview">
   <div class="stations" id="stations"></div>
 
   <div class="kpis" id="kpis"></div>
@@ -282,6 +396,26 @@ if (typeof echarts === 'undefined') {
       <div class="m-card"><h4 id="dProfH">品类 × 12 月 毛利（元）</h4><div id="dProf" class="m-chart" style="height:280px"></div></div>
       <div class="m-card" style="grid-column:1/-1"><h4>金额 / 毛利 年度合计（万元）</h4>
         <div style="overflow:auto"><table class="m-table" id="dTable"></table></div></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ═══ 预测视图 ═══ -->
+  <div class="view" id="view-forecast">
+    <div class="fc-kpis" id="fcKpis"></div>
+    <div class="card wide">
+      <h3>全年预测 · 双情景对比（毛利红线 23.5% vs 24%）</h3>
+      <div class="sub">单位：万元 · 23.5%=守住公司整体毛利红线情景 · 24%=提高红线情景（烟草去化更保守）</div>
+      <div id="fc1" class="chart tall" style="height:360px"></div>
+    </div>
+    <div class="card wide" style="margin-top:14px">
+      <h3>销量任务超额（双情景）</h3>
+      <div class="sub">全年任务 1130 万元 · 超额率 %</div>
+      <div id="fc2" class="chart" style="height:220px"></div>
+    </div>
+    <div class="sms-card">
+      <h3>预测短信原文（取自驾驶舱「目标达成」）</h3>
+      <div class="sms" id="fcSms"></div>
     </div>
   </div>
 
@@ -563,6 +697,58 @@ function buildChips(){
 function syncChips(){ document.querySelectorAll('#stations .chip').forEach(c=>{
   c.classList.toggle('active', (c.classList.contains('all')&&SEL==='全公司') || c.textContent===SEL); }); }
 
+// ---------- 标签页切换 ----------
+function switchView(name){
+  document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('active', t.dataset.view===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+name));
+  if(name==='forecast'){ renderForecast(); }
+  setTimeout(()=>charts.forEach(c=>c.resize()), 60);
+}
+
+// ---------- 预测视图 ----------
+function renderForecast(){
+  const fc = DATA.forecast || {};
+  const k = fc.kpis || {};
+  const ex = fc.extra || {};
+  // KPI
+  const cards = [
+    {k:'累计含去化销售额', v:k['累计含去化销售额万']==null?'—':Number(k['累计含去化销售额万']).toFixed(2), u:'万', s:'含烟草批发去化口径'},
+    {k:'自然口径累计', v:k['自然口径累计万']==null?'—':Number(k['自然口径累计万']).toFixed(2), u:'万', s:'不含烟草批发的自然经营口径'},
+    {k:'整体毛利率', v:k['整体毛利率']==null?'—':Number(k['整体毛利率']).toFixed(2), u:'%', s:'当前累计毛利 ÷ 累计销售额'},
+    {k:'华山站停业扣除', v:k['华山扣除万']==null?'—':Number(k['华山扣除万']).toFixed(2), u:'万', s:'10/15–12/25 停业预测损失'},
+  ];
+  document.getElementById('fcKpis').innerHTML = cards.map(c=>
+    `<div class="fc-kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
+
+  // 双情景对比图
+  const sc = fc.scenarios || {labels:[], A:[], B:[]};
+  mk('fc1',{tooltip:{...baseTip,valueFormatter: v=>num2(v)+' 万'},
+    legend:{data:['23.5%红线','24%红线'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
+    grid:{left:56,right:24,top:36,bottom:40}, xAxis:cat(sc.labels), yAxis:val('万元'),
+    series:[
+      {name:'23.5%红线',type:'bar',data:sc.A,barWidth:26,itemStyle:{color:'#34d399',borderRadius:[4,4,0,0]},
+        label:{show:true,position:'top',color:C.mut,fontSize:9.5,formatter:p=>Number(p.value).toFixed(1)}},
+      {name:'24%红线',type:'bar',data:sc.B,barWidth:26,itemStyle:{color:'#fbbf24',borderRadius:[4,4,0,0]},
+        label:{show:true,position:'top',color:C.mut,fontSize:9.5,formatter:p=>Number(p.value).toFixed(1)}}
+    ]});
+
+  // 销量超额
+  const ov = fc.overrun || {};
+  mk('fc2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+Number(p[0].value).toFixed(2)+'%'},
+    grid:{left:56,right:24,top:24,bottom:34}, xAxis:cat(['23.5%红线','24%红线']),
+    yAxis:val('超额率',v=>v+'%'),
+    series:[{type:'bar',data:[ov.A, ov.B],barWidth:52,
+      itemStyle:{color:p=>p.dataIndex===0?'#34d399':'#fbbf24',borderRadius:[4,4,0,0]},
+      label:{show:true,position:'top',color:C.mut,fontSize:11,formatter:p=>Number(p.value).toFixed(2)+'%'}}]});
+
+  // 短信原文
+  const sms = fc.sms || '';
+  const lines = sms.split('\n').filter(Boolean);
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  document.getElementById('fcSms').innerHTML = lines.map((ln,i)=>`<div>${esc(ln)}</div>`).join('')
+    + `<div class="note">数据截至 ${fc.asOf||'—'} · 预测截止 ${fc.predEnd||'—'} · 剩余 ${fc.remainingMonths??'—'} 个月 · 当前香烟库存 ${ex['当前香烟库存万']??'—'}万（库存约束去化上限 ${ex['库存约束去化上限万']??'—'}万${ex['库存是否封顶']===1?'，已封顶':''}）</div>`;
+}
+
 // 图1/图2 柱体点击 -> 选中该站 (联动)
 function bindChartClick(){
   ['c1','c2'].forEach(id=>{
@@ -574,6 +760,9 @@ function bindChartClick(){
 buildChips();
 renderAll();
 bindChartClick();
+document.querySelectorAll('#tabs .tab').forEach(t=>{
+  t.addEventListener('click', ()=>switchView(t.dataset.view));
+});
 window.addEventListener('resize',()=>charts.forEach(c=>c.resize()));
 </script>
 </body>
