@@ -1,216 +1,615 @@
 # -*- coding: utf-8 -*-
 """
-build_dashboard.py — 把「非油销售汇总驾驶舱V1.xlsx」图表驾驶舱里的 10 张图表
-重做成纯静态网页 (web/index.html)，数据内嵌、零 Excel 依赖、加载飞快。
+build_dashboard.py — 把「非油销售汇总驾驶舱V1.xlsx」图表数据源里的数据
+重做成纯静态网页 (web/index.html) + 数据层 (web/data.json)。
+
+设计要点:
+- 全部用【标签扫描】定位「图表数据源」的 块1~块6 与「按月汇总各站」的分类明细块，
+  绝不硬编码行号(此前硬编码曾导致尾部站点错位，见项目记忆)。
+- 提取覆盖: 15 站 × 12 月 金额/毛利(含+不含) / 各站年任务与累计完成 / 公司月度
+  金额+环比 / 品类构成(5类) / 双口径 / 【品类明细】(5品类+非油合计 × 15站 × 12月 金额+毛利)。
+- 生成的 index.html: 数据内嵌 + 联动(站点选择器 + 点击图表联动筛选) + 站点明细弹窗
+  (品类×12月金额/毛利堆叠柱 + 构成饼 + 合计表) + porcelain 青瓷蓝主题，加载飞快。
+- 公司级图表(构成/双口径/任务/月度)在选中某站后自动切换为该站数据。
+- 每日自动更新由 GitHub Action(10点) 重跑本脚本(读 data.json) + AirScript 云端
+  推送 data.json 共同完成。
 
 用法:
-    python build_dashboard.py
-依赖: openpyxl (项目隔离环境已带)
-说明:
-    - 生成的 index.html 可单独丢到任意静态托管 (GitHub Pages / Nginx / OSS)。
-    - 每次 Excel 数据刷新后，重跑本脚本即可让网页同步最新快照。
+    python build_dashboard.py            # 读 Excel -> data.json + index.html
+    python build_dashboard.py --from-json # 只读 data.json -> 重渲染 index.html (Action 用)
+依赖: openpyxl
 """
-import os, json, openpyxl
+import os, json, sys, datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DASH = os.path.join(HERE, "..", "非油销售汇总驾驶舱V1.xlsx")
-OUT  = os.path.join(HERE, "index.html")
+DATA_JSON = os.path.join(HERE, "data.json")
+INDEX = os.path.join(HERE, "index.html")
 
-wb = openpyxl.load_workbook(DASH, data_only=False)
-cd = wb["图表数据源"]
-cp = wb["图表驾驶舱"]
+STATION_ORDER = ["秦岭", "宁陕", "洋县", "汉中", "富平", "韩城", "富县", "南沙",
+                 "华山", "白河", "旬阳", "略阳", "玉华宫", "照金", "天汉水城"]
+CAT_DETAIL = ["汽车用品", "便利百货", "香烟零售", "烟草批发", "咖啡"]
+CAT_DETAIL_ALL = CAT_DETAIL + ["非油合计"]
+TASK_TOTAL = 1130  # 全年任务(万元)
 
-def g(r, c):  # 图表数据源 单元格
-    return cd.cell(r, c).value
-def p(r, c):  # 图表驾驶舱 单元格
-    return cp.cell(r, c).value
 
-# ---------- 图1-4: 各站年任务与累计完成 (块6, 行93-107) ----------
-stations   = [g(r, 1) for r in range(93, 108)]      # 15 站
-year_task  = [g(r, 2) for r in range(93, 108)]      # 年任务(万)
-comp_tob   = [g(r, 3) for r in range(93, 108)]      # 含烟草累计完成(万)
-comp_non   = [g(r, 5) for r in range(93, 108)]      # 不含烟草累计完成(万)
-rate_tob   = [g(r, 4) for r in range(93, 108)]      # 含烟草完成率
-rate_non   = [g(r, 6) for r in range(93, 108)]      # 不含烟草完成率
+def load_excel():
+    import openpyxl
+    return openpyxl.load_workbook(DASH, data_only=False)
 
-# ---------- 图5/6: 各站分会计月销售趋势 (块1 含烟草 行6-11 / 块2 不含 行25-30) ----------
-MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
-trend_stations = [g(r, 1) for r in range(6, 12)]     # 趋势图含的 6 站
-trend_tob   = [[g(r, 1 + m) for m in range(1, 9)] for r in range(6, 12)]   # 含烟草 元
-trend_non   = [[g(r, 1 + m) for m in range(1, 9)] for r in range(25, 31)]  # 不含烟草 元
 
-# ---------- 图7/8: 全公司月度变化 (行86 含烟草 / 87 不含 / 88 含烟草环比) ----------
-month_tob = [g(86, 1 + m) for m in range(1, 13)]     # 含烟草月度金额 元
-month_non = [g(87, 1 + m) for m in range(1, 13)]     # 不含烟草月度金额 元
-month_tob_mom = [g(88, 1 + m) for m in range(1, 13)] # 含烟草环比
-# 不含烟草环比现场推算
-month_non_mom = [None] + [
-    round((month_non[i] - month_non[i-1]) / month_non[i-1], 4) if (month_non[i] is not None and month_non[i-1]) else None
-    for i in range(1, 12)
-]
-# 只取有数据的月份 (1-8)
-def trim(row):
-    return [row[i] for i in range(8)]
-month_labels = MONTHS[:8]
-month_tob = trim(month_tob); month_non = trim(month_non)
-month_tob_mom = trim(month_tob_mom); month_non_mom = trim(month_non_mom)
-trend_tob = [trim(r) for r in trend_tob]; trend_non = [trim(r) for r in trend_non]
+def find_row(ws, kw, start=1, end=None):
+    end = end or ws.max_row
+    for r in range(start, end + 1):
+        v = ws.cell(r, 1).value
+        if isinstance(v, str) and kw in v:
+            return r
+    return None
 
-# ---------- 图9: 含烟草金额构成 (饼) 源头 图表数据源 N82:N85 /1e4 ----------
-pie_raw = [g(82, 14), g(83, 14), g(84, 14), g(85, 14)]   # 元
-pie = [["汽车用品", round(pie_raw[0]/1e4, 2)],
-       ["便利百货", round(pie_raw[1]/1e4, 2)],
-       ["香烟",     round(pie_raw[2]/1e4, 2)],
-       ["咖啡",     round(pie_raw[3]/1e4, 2)]]
 
-# ---------- 图10: 双口径对比 (金额/毛利, 万元) ----------
-dual = {
-    "cats":   ["金额", "毛利"],
-    "nontob": [round(g(40, 14)/1e4, 2), round(g(78, 14)/1e4, 2)],  # N40/N78
-    "tob":    [round(g(21, 14)/1e4, 2), round(g(59, 14)/1e4, 2)],  # N21/N59
-}
+def station_rows(ws, after_title):
+    """标题行之后, 站名所在的行号映射(扫描到非站名/合计/下一块为止)。"""
+    rows = {}
+    for r in range(after_title + 2, after_title + 40):
+        v = ws.cell(r, 1).value
+        if v in STATION_ORDER:
+            rows[v] = r
+        elif isinstance(v, str) and ("合计" in v or "块" in v):
+            break
+    return rows
 
-DATA = {
-    "stations": stations, "year_task": year_task,
-    "comp_tob": comp_tob, "comp_non": comp_non,
-    "rate_tob": rate_tob, "rate_non": rate_non,
-    "trend_stations": trend_stations, "trend_months": month_labels,
-    "trend_tob": trend_tob, "trend_non": trend_non,
-    "month_labels": month_labels,
-    "month_tob": month_tob, "month_non": month_non,
-    "month_tob_mom": month_tob_mom, "month_non_mom": month_non_mom,
-    "pie": pie, "dual": dual,
-}
 
-# ============================ 生成 HTML ============================
-HTML = """<!doctype html>
+def total_row(ws, after_title):
+    for r in range(after_title + 2, after_title + 40):
+        v = ws.cell(r, 1).value
+        if isinstance(v, str) and "合计" in v:
+            return r
+    return None
+
+
+def build_data():
+    wb = load_excel()
+    cd = wb["图表数据源"]
+    ms = wb["按月汇总各站"]
+
+    b1 = find_row(cd, "块1 ·"); r1 = station_rows(cd, b1)
+    b2 = find_row(cd, "块2 ·"); r2 = station_rows(cd, b2)
+    b3 = find_row(cd, "块3 ·"); r3 = station_rows(cd, b3)
+    b4 = find_row(cd, "块4 ·"); r4 = station_rows(cd, b4)
+
+    def monthly(rmap):
+        return {st: [cd.cell(r, 1 + m).value for m in range(1, 13)] for st, r in rmap.items()}
+
+    monthly_data = {
+        "tob": monthly(r1), "non": monthly(r2),
+        "tobProfit": monthly(r3), "nonProfit": monthly(r4),
+    }
+
+    # 块6: 各站年任务与累计完成(万元)
+    b6 = find_row(cd, "块6 ·")
+    cr = station_rows(cd, b6)
+    stations = []
+    for st in STATION_ORDER:
+        r = cr[st]
+        stations.append({
+            "name": st,
+            "yearTask": cd.cell(r, 2).value,
+            "compTob": cd.cell(r, 3).value,
+            "rateTob": cd.cell(r, 4).value,
+            "compNon": cd.cell(r, 5).value,
+            "rateNon": cd.cell(r, 6).value,
+        })
+
+    # 块5: 公司月度 + 环比（保留，供公司视角月度图）
+    b5 = find_row(cd, "块5 ·")
+    r_tob = find_row(cd, "含烟草合计", start=b5)
+    r_non = find_row(cd, "不含烟草合计", start=b5)
+    r_tobm = find_row(cd, "含烟草环比", start=b5)
+    r_nonm = find_row(cd, "不含烟草环比", start=b5)
+    company = {
+        "monthLabels": [f"{m}月" for m in range(1, 13)],
+        "tob": [cd.cell(r_tob, 1 + m).value for m in range(1, 13)],
+        "non": [cd.cell(r_non, 1 + m).value for m in range(1, 13)],
+        "tobMom": [cd.cell(r_tobm, 1 + m).value for m in range(1, 13)],
+        "nonMom": [cd.cell(r_nonm, 1 + m).value for m in range(1, 13)],
+    }
+
+    # ── 分类明细块：按月汇总各站「各站逐月分类明细」(5品类 + 非油合计) ×15站×12月 金额+毛利 ──
+    def cat_titles():
+        titles = {}
+        for r in range(40, ms.max_row + 1):
+            v = ms.cell(r, 1).value
+            if isinstance(v, str) and "·" in v:
+                name = v.split("·")[0].strip()
+                if name in CAT_DETAIL_ALL:
+                    titles[name] = r
+        return titles
+
+    def cat_matrix(title_row):
+        """标题行后按序收集站名行：前 15 行为金额区、后 15 行为毛利区。"""
+        st_rows = []
+        for r in range(title_row + 1, title_row + 45):
+            v = ms.cell(r, 1).value
+            if v in STATION_ORDER:
+                st_rows.append((v, r))
+        amt = {name: [ms.cell(r, 1 + m).value for m in range(1, 13)] for name, r in st_rows[:15]}
+        prof = {name: [ms.cell(r, 1 + m).value for m in range(1, 13)] for name, r in st_rows[15:30]}
+        return amt, prof
+
+    ct = cat_titles()
+    cat_amount, cat_profit = {}, {}
+    for c in CAT_DETAIL_ALL:
+        amt, prof = cat_matrix(ct[c])
+        cat_amount[c] = amt
+        cat_profit[c] = prof
+    category_detail = {"cats": CAT_DETAIL_ALL, "amount": cat_amount, "profit": cat_profit}
+
+    # 公司品类年度合计（5 品类，万元）—— 由分类明细块汇总，保证与明细一致
+    comp5 = []
+    for c in CAT_DETAIL:
+        total = sum(v or 0 for st in STATION_ORDER for v in cat_amount[c].get(st, [0] * 12))
+        comp5.append(round(total / 1e4, 2))
+    composition = {"cats": CAT_DETAIL, "tob": comp5}
+
+    # 双口径 + 公司总额: 各块合计行 N 列
+    n_tob = total_row(cd, b1); n_non = total_row(cd, b2)
+    n_tobp = total_row(cd, b3); n_nonp = total_row(cd, b4)
+    totals = {
+        "tobAmount": round((cd.cell(n_tob, 14).value or 0) / 1e4, 2),
+        "nonAmount": round((cd.cell(n_non, 14).value or 0) / 1e4, 2),
+        "tobProfit": round((cd.cell(n_tobp, 14).value or 0) / 1e4, 2),
+        "nonProfit": round((cd.cell(n_nonp, 14).value or 0) / 1e4, 2),
+    }
+    dual = {
+        "cats": ["金额", "毛利"],
+        "tob": [totals["tobAmount"], totals["tobProfit"]],
+        "non": [totals["nonAmount"], totals["nonProfit"]],
+    }
+
+    return {
+        "generatedAt": datetime.date.today().isoformat(),
+        "taskTotal": TASK_TOTAL,
+        "stations": stations,
+        "monthly": monthly_data,
+        "company": company,
+        "composition": composition,
+        "categoryDetail": category_detail,
+        "dual": dual,
+        "totals": totals,
+    }
+
+
+HTML = r"""<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>非油销售汇总驾驶舱 · 图表视图</title>
-<script src="https://lib.baomitu.com/echarts/5.5.0/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script>
 if (typeof echarts === 'undefined') {
-  document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\\/scr'+'ipt>');
+  document.write('<scr'+'ipt src="https://lib.baomitu.com/echarts/5.5.0/echarts.min.js"><\/scr'+'ipt>');
 }
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#0f1420; --card:#1a2030; --line:#2a3346; --txt:#e6edf3; --sub:#9aa7bd; --acc:#4ea1ff; --acc2:#ff9f43; --good:#3ddc97; }
+  :root{
+    --bg:#F7F2EB; --card:#FCFAF6; --ink:#081F5C; --txt:#1b2233; --mut:#5b6478;
+    --faint:#9aa3b5; --grid:#e6e0d6; --line:#ede7dd;
+    --data:#334EAC; --data2:#7096D1; --hero:#081F5C; --accent:#D4A017;
+    --good:#2f7d5b;
+  }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--txt);font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;padding:18px}
-  header{margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px}
-  header h1{font-size:20px;font-weight:600}
-  header p{color:var(--sub);font-size:12px;margin-top:4px}
+  body{background:var(--bg);color:var(--txt);font-family:'Inter','Microsoft YaHei','PingFang SC',sans-serif;
+    padding:26px 22px 40px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1480px;margin:0 auto}
+  header{margin-bottom:18px}
+  header h1{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+  header p{color:var(--mut);font-size:12.5px;margin-top:5px}
+  .upd{color:var(--faint);font-size:11px;margin-top:2px}
+
+  /* 联动站点选择器 */
+  .stations{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 18px}
+  .chip{padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--card);
+    color:var(--mut);font-size:12.5px;cursor:pointer;transition:.18s;user-select:none}
+  .chip:hover{border-color:var(--data2);color:var(--data)}
+  .chip.active{background:var(--hero);color:#fff;border-color:var(--hero);font-weight:600}
+  .chip.all.active{background:var(--accent);border-color:var(--accent)}
+
+  /* KPI 行 */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px}
+  .kpi .k{font-size:12px;color:var(--mut);font-weight:500}
+  .kpi .v{font-size:27px;font-weight:800;color:var(--ink);margin-top:6px;letter-spacing:-.02em}
+  .kpi .v small{font-size:13px;font-weight:600;color:var(--mut);margin-left:3px}
+  .kpi .s{font-size:11.5px;color:var(--good);margin-top:3px}
+
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-  @media(max-width:900px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px 4px}
-  .card h3{font-size:13px;font-weight:500;color:var(--sub);margin-bottom:6px;padding-left:6px;border-left:3px solid var(--acc)}
-  .chart{width:100%;height:300px}
-  footer{margin-top:16px;color:var(--sub);font-size:11px;text-align:center}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px 8px}
+  .card.wide{grid-column:1/-1}
+  .card h3{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;padding-left:8px;border-left:3px solid var(--data)}
+  .card .sub{font-size:11px;color:var(--faint);margin-bottom:8px;padding-left:8px}
+  .chart{width:100%;height:330px}
+  .chart.tall{height:380px}
+  footer{margin-top:18px;color:var(--faint);font-size:11px;text-align:center;line-height:1.6}
+
+  .m-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .m-card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 12px 6px}
+  .m-card h4{font-size:12.5px;color:var(--ink);font-weight:600;margin-bottom:4px;padding-left:8px;border-left:3px solid var(--data2)}
+  .m-chart{width:100%;height:270px}
+  .m-table{width:100%;border-collapse:collapse;font-size:12px}
+  .m-table th,.m-table td{border:1px solid var(--line);padding:7px 10px;text-align:left}
+  .m-table th{background:#EEF2FB;color:var(--ink);font-weight:600}
+  .m-table .r{text-align:right}
+  .m-table tr.tot td{background:#FFF6E0;font-weight:700;color:var(--ink)}
+  @media(max-width:760px){.m-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header>
-  <h1>非油销售汇总驾驶舱 · 图表视图</h1>
-  <p>静态快照 · 数据取自「图表驾驶舱」10 张图表 · 由 build_dashboard.py 从驾驶舱 Excel 生成</p>
-</header>
-<main class="grid">
-  <div class="card"><h3>任务完成情况（含烟草）· 各站年任务 vs 累计完成（万元）</h3><div id="c1" class="chart"></div></div>
-  <div class="card"><h3>各站年任务 vs 累计完成（不含烟草，万元）</h3><div id="c2" class="chart"></div></div>
-  <div class="card"><h3>各站任务完成比（含烟草）· 累计完成 ÷ 年任务</h3><div id="c3" class="chart"></div></div>
-  <div class="card"><h3>各站任务完成比（不含烟草）· 累计完成 ÷ 年任务</h3><div id="c4" class="chart"></div></div>
-  <div class="card"><h3>各任务销售趋势（含烟草）· 各站分会计月非油金额（元）</h3><div id="c5" class="chart"></div></div>
-  <div class="card"><h3>各任务销售趋势（不含烟草）· 各站分会计月非油金额（元）</h3><div id="c6" class="chart"></div></div>
-  <div class="card"><h3>非油月度变化（含烟草）· 月度金额与环比</h3><div id="c7" class="chart"></div></div>
-  <div class="card"><h3>非油月度变化（不含烟草）· 月度金额与环比</h3><div id="c8" class="chart"></div></div>
-  <div class="card"><h3>含烟草金额构成（汽车用品 / 便利百货 / 香烟 / 咖啡，万元）</h3><div id="c9" class="chart"></div></div>
-  <div class="card"><h3>含烟草 vs 不含烟草（金额 / 毛利，万元）</h3><div id="c10" class="chart"></div></div>
-</main>
-<footer>本页为静态快照，不含动态计算能力；数据更新后重跑 build_dashboard.py 重新生成即可。</footer>
+<div class="wrap">
+  <header>
+    <h1>非油销售汇总驾驶舱 · 图表视图</h1>
+    <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
+    <div class="upd" id="upd"></div>
+  </header>
+
+  <div class="stations" id="stations"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card"><h3 id="t1">各站任务完成排行 · 年任务 vs 累计完成（含烟草）</h3>
+      <div class="sub">万元 · 深色=当前选中站 · 点击柱体可切换选中并查看明细</div><div id="c1" class="chart"></div></div>
+    <div class="card"><h3 id="t2">各站任务完成率（含烟草）</h3>
+      <div class="sub">累计完成 ÷ 年任务 · 深色=当前选中站</div><div id="c2" class="chart"></div></div>
+    <div class="card wide"><h3 id="t3">各站分会计月销售趋势（含烟草金额）</h3>
+      <div class="sub">元 · 选中单站时该站加粗高亮、其余淡显；选「全公司」则均衡展示</div><div id="c3" class="chart tall"></div></div>
+    <div class="card wide"><h3 id="t4">全公司月度非油金额与环比（含烟草）</h3>
+      <div class="sub">柱=月度金额(元) · 线=环比(%)</div><div id="c4" class="chart"></div></div>
+    <div class="card"><h3 id="t5">金额构成（含烟草 · 年度累计，万元）</h3>
+      <div class="sub">汽车用品 / 便利百货 / 香烟零售 / 烟草批发 / 咖啡</div><div id="c5" class="chart"></div></div>
+    <div class="card"><h3 id="t6">双口径对比（金额 / 毛利，万元）</h3>
+      <div class="sub">含烟草 vs 不含烟草</div><div id="c6" class="chart"></div></div>
+  </div>
+
+  <div class="card wide" style="margin-top:14px">
+    <h3 id="detailTitle">品类构成与明细</h3>
+    <div class="sub" id="detailSub" style="margin-bottom:10px">5 品类 × 12 会计月 金额/毛利堆叠、年度构成、合计表</div>
+    <div class="m-grid">
+      <div class="m-card"><h4 id="dAmtH">品类 × 12 月 金额（元）</h4><div id="dAmt" class="m-chart" style="height:280px"></div></div>
+      <div class="m-card"><h4 id="dProfH">品类 × 12 月 毛利（元）</h4><div id="dProf" class="m-chart" style="height:280px"></div></div>
+      <div class="m-card"><h4>年度构成（万元）</h4><div id="dPie" class="m-chart" style="height:280px"></div></div>
+      <div class="m-card"><h4>金额/毛利年度合计</h4>
+        <div style="overflow:auto"><table class="m-table" id="dTable"></table></div></div>
+    </div>
+  </div>
+
+  <footer>
+    本页为静态快照，数据由 build_dashboard.py 从驾驶舱 Excel 生成；每日 10:00（北京时间）由 GitHub Action 自动重算刷新。<br>
+    联动仅影响展示视角，不改变任一数据源。点击站点标签切换视角，品类明细同步更新。
+  </footer>
+</div>
+
 <script>
 const DATA = __DATA__;
-const grid = {left:48,right:18,top:36,bottom:30};
-const baseGrid = {left:50,right:20,top:40,bottom:34};
-const cat = (data)=>({type:'category',data:data,axisLine:{lineStyle:{color:'#3a4660'}},axisLabel:{color:'#9aa7bd',fontSize:10}});
-const val = (name,fmt)=>({type:'value',name:name,axisLine:{lineStyle:{color:'#3a4660'}},splitLine:{lineStyle:{color:'#222b3d'}},axisLabel:{color:'#9aa7bd',fontSize:10,formatter:fmt||undefined}});
-const tip = {trigger:'axis',backgroundColor:'#0d1220',borderColor:'#2a3346',textStyle:{color:'#e6edf3'}};
-const tipItem = {trigger:'item',backgroundColor:'#0d1220',borderColor:'#2a3346',textStyle:{color:'#e6edf3'}};
-const legend = {textStyle:{color:'#9aa7bd',fontSize:11},top:6};
-const PALETTE = ['#4ea1ff','#ff9f43','#3ddc97','#b07bff','#ff6b6b','#f7d154','#5ad1e0'];
+const CAT_DETAIL = DATA.composition.cats;   // 5 品类（不含非油合计）
+const C = { ink:'#081F5C', txt:'#1b2233', mut:'#5b6478', faint:'#9aa3b5', grid:'#e6e0d6',
+            data:'#334EAC', data2:'#7096D1', hero:'#081F5C', sheet:'#FCFAF6' };
+const PALETTE = ['#334EAC','#7096D1','#9DB8E0','#B9CFEB','#5b7fc4','#86a5d8','#c2d4ee',
+                 '#3f5fa0','#7d9bd0','#a9c1e6','#2f4f8f','#94b0dd','#bcd0ee','#46639c','#88a6d6'];
+const MODAL_PALETTE = ['#081F5C','#334EAC','#7096D1','#B9CFEB','#D4A017','#9DB8E0'];
+const fmtW = v => (v==null?'—':(v/10000).toFixed(1)+'万');
+const sum12 = arr => (arr||[]).reduce((a,b)=>a+(b||0),0);
 const charts = [];
-function mk(id,opt){ const el=document.getElementById(id); const c=echarts.init(el,null,{renderer:'canvas'}); c.setOption(opt); charts.push(c); }
+function mk(id, opt){ const el=document.getElementById(id);
+  const c=echarts.init(el,null,{renderer:'canvas'}); c.setOption(opt); charts.push(c); return c; }
+const baseTip = {trigger:'axis', backgroundColor:'#081F5C', borderWidth:0, padding:[9,13],
+  textStyle:{color:'#FCFAF6', fontFamily:'Inter', fontSize:12}};
+const tipItem = {trigger:'item', backgroundColor:'#081F5C', borderWidth:0, padding:[9,13],
+  textStyle:{color:'#FCFAF6', fontFamily:'Inter', fontSize:12}};
+const baseGrid = {left:54,right:22,top:30,bottom:46};
+const cat = d => ({type:'category',data:d,axisLine:{lineStyle:{color:C.grid}},
+  axisTick:{show:false}, axisLabel:{color:C.mut,fontSize:11}});
+const val = (name,fmt) => ({type:'value',name:name,nameTextStyle:{color:C.mut,fontSize:10},
+  axisLine:{show:false},splitLine:{lineStyle:{color:C.grid}},axisLabel:{color:C.mut,fontSize:11,formatter:fmt}});
 
-// 图1
-mk('c1',{tooltip:tip,legend:legend,grid:baseGrid,color:PALETTE,
-  xAxis:cat(DATA.stations),yAxis:val('万元'),
-  series:[
-    {name:'年任务',type:'bar',data:DATA.year_task,barWidth:14},
-    {name:'含烟草累计完成',type:'bar',data:DATA.comp_tob,barWidth:14}
-  ]});
-// 图2
-mk('c2',{tooltip:tip,legend:legend,grid:baseGrid,color:PALETTE,
-  xAxis:cat(DATA.stations),yAxis:val('万元'),
-  series:[
-    {name:'年任务',type:'bar',data:DATA.year_task,barWidth:14},
-    {name:'不含烟草累计完成',type:'bar',data:DATA.comp_non,barWidth:14}
-  ]});
-// 图3
-mk('c3',{tooltip:tip,grid:baseGrid,color:PALETTE,
-  xAxis:cat(DATA.stations),yAxis:val('完成率',v=>(v*100).toFixed(0)+'%'),
-  series:[{name:'含烟草完成率',type:'bar',data:DATA.rate_tob.map(v=>v==null?null:+(v*100).toFixed(1)),
-    label:{show:true,position:'top',color:'#9aa7bd',fontSize:9,formatter:p=>(p.value==null?'':p.value+'%')}}]});
-// 图4
-mk('c4',{tooltip:tip,grid:baseGrid,color:PALETTE,
-  xAxis:cat(DATA.stations),yAxis:val('完成率',v=>(v*100).toFixed(0)+'%'),
-  series:[{name:'不含烟草完成率',type:'bar',data:DATA.rate_non.map(v=>v==null?null:+(v*100).toFixed(1)),
-    label:{show:true,position:'top',color:'#9aa7bd',fontSize:9,formatter:p=>(p.value==null?'':p.value+'%')}}]});
-// 图5
-mk('c5',{tooltip:tip,legend:Object.assign({data:DATA.trend_stations},legend),grid:baseGrid,color:PALETTE,
-  xAxis:cat(DATA.trend_months),yAxis:val('元'),
-  series:DATA.trend_stations.map((s,i)=>({name:s,type:'line',smooth:true,data:DATA.trend_tob[i]}))});
-// 图6
-mk('c6',{tooltip:tip,legend:Object.assign({data:DATA.trend_stations},legend),grid:baseGrid,color:PALETTE,
-  xAxis:cat(DATA.trend_months),yAxis:val('元'),
-  series:DATA.trend_stations.map((s,i)=>({name:s,type:'line',smooth:true,data:DATA.trend_non[i]}))});
-// 图7 含烟草 月度金额(柱)+环比(线,次轴)
-mk('c7',{tooltip:tip,legend:Object.assign({data:['含烟草金额','含烟草环比']},legend),grid:Object.assign({},baseGrid,{right:55}),color:PALETTE,
-  xAxis:cat(DATA.month_labels),
-  yAxis:[val('元'),{type:'value',name:'环比',axisLine:{lineStyle:{color:'#3a4660'}},splitLine:{show:false},axisLabel:{color:'#9aa7bd',fontSize:10,formatter:v=>(v*100).toFixed(0)+'%'}}],
-  series:[
-    {name:'含烟草金额',type:'bar',data:DATA.month_tob,barWidth:20},
-    {name:'含烟草环比',type:'line',yAxisIndex:1,smooth:true,data:DATA.month_tob_mom,lineStyle:{width:2},itemStyle:{color:'#ff9f43'}}
-  ]});
-// 图8 不含烟草 月度金额(柱)+环比(线,次轴)
-mk('c8',{tooltip:tip,legend:Object.assign({data:['不含烟草金额','不含烟草环比']},legend),grid:Object.assign({},baseGrid,{right:55}),color:PALETTE,
-  xAxis:cat(DATA.month_labels),
-  yAxis:[val('元'),{type:'value',name:'环比',axisLine:{lineStyle:{color:'#3a4660'}},splitLine:{show:false},axisLabel:{color:'#9aa7bd',fontSize:10,formatter:v=>(v*100).toFixed(0)+'%'}}],
-  series:[
-    {name:'不含烟草金额',type:'bar',data:DATA.month_non,barWidth:20},
-    {name:'不含烟草环比',type:'line',yAxisIndex:1,smooth:true,data:DATA.month_non_mom,lineStyle:{width:2},itemStyle:{color:'#ff9f43'}}
-  ]});
-// 图9 饼
-mk('c9',{tooltip:tipItem,legend:Object.assign({orient:'vertical',left:'left'},legend),color:PALETTE,
-  series:[{type:'pie',radius:['38%','66%'],center:['58%','54%'],
-    label:{color:'#e6edf3',fontSize:11,formatter:'{b}\\n{c}万'},
-    data:DATA.pie.map(d=>({name:d[0],value:d[1]}))}]});
-// 图10 双口径
-mk('c10',{tooltip:tip,legend:Object.assign({data:['不含烟草','含烟草']},legend),grid:baseGrid,color:PALETTE,
-  xAxis:cat(DATA.dual.cats),yAxis:val('万元'),
-  series:[
-    {name:'不含烟草',type:'bar',data:DATA.dual.nontob,barWidth:34},
-    {name:'含烟草',type:'bar',data:DATA.dual.tob,barWidth:34}
-  ]});
+let SEL = '全公司';
 
+// ---------- KPI ----------
+function renderKPI(){
+  const t = DATA.totals, task = DATA.taskTotal;
+  const stObj = SEL === '全公司' ? null : DATA.stations.find(s => s.name === SEL);
+  const comp   = stObj ? stObj.compTob   : t.tobAmount;
+  const rate   = stObj ? stObj.rateTob*100 : (t.tobAmount/task*100);
+  const profit = stObj ? Math.round(sum12(DATA.monthly.tobProfit[SEL])/1e2)/100 : t.tobProfit;
+  const profRate = stObj ? (comp ? profit/comp*100 : 0) : (t.tobProfit/t.tobAmount*100);
+  const yearTask  = stObj ? stObj.yearTask : task;
+  const subt1 = stObj ? `年任务 ${yearTask}万 · 进度 ${rate.toFixed(1)}%`
+                       : `全年任务 ${task}万 · 进度 ${(t.tobAmount/task*100).toFixed(1)}%`;
+  const cards = [
+    {k: stObj ? '本站累计完成(含烟草)' : '累计完成(含烟草)',
+      v: comp==null?'—':comp.toFixed(1), u:'万', s: subt1},
+    {k: '完成率(含烟草)', v: rate==null?'—':rate.toFixed(1), u:'%',
+      s: rate>=100 ? '已达标 ✔' : ((100-rate).toFixed(1)+'% 待完成')},
+    {k: stObj ? '本站累计毛利(含烟草)' : '累计毛利(含烟草)',
+      v: profit==null?'—':profit.toFixed(1), u:'万',
+      s: '毛利率 ' + profRate.toFixed(1) + '%'},
+    {k: stObj ? '本站年任务' : '全年任务',
+      v: yearTask, u:'万', s: stObj ? '本站任务盘（不含烟草去化）' : '烟草去化已计入'},
+  ];
+  document.getElementById('kpis').innerHTML = cards.map(c=>
+    `<div class="kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
+}
+
+// ---------- 图1 任务（公司=排行；选中站=该站任务进度） ----------
+function renderRank(){
+  const t = document.getElementById('t1');
+  if(SEL === '全公司'){
+    t.textContent = '各站任务完成排行 · 年任务 vs 累计完成（含烟草）';
+    const st = DATA.stations.slice().sort((a,b)=>b.compTob-a.compTob);
+    const names = st.map(s=>s.name), task = st.map(s=>s.yearTask), done = st.map(s=>s.compTob);
+    const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
+    mk('c1',{tooltip:baseTip,legend:{data:['年任务','累计完成'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+      grid:baseGrid, xAxis:cat(names), yAxis:val('万元'),
+      series:[
+        {name:'年任务',type:'bar',data:task,barWidth:13,itemStyle:{color:'#cfd9ec',borderRadius:[4,4,0,0]}},
+        {name:'累计完成',type:'bar',data:done,barWidth:13,
+          itemStyle:{color:p=>colors[p.dataIndex]!==undefined?colors[p.dataIndex]:C.data,borderRadius:[4,4,0,0]},
+          label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>p.value}}
+      ]});
+    return;
+  }
+  const s = DATA.stations.find(x=>x.name===SEL);
+  t.textContent = SEL + ' · 任务进度（年任务 vs 累计完成，万元）';
+  mk('c1',{tooltip:baseTip, grid:baseGrid, xAxis:cat(['年任务','累计完成']), yAxis:val('万元'),
+    series:[{type:'bar',data:[s.yearTask, s.compTob],barWidth:44,
+      itemStyle:{color:p=>p.dataIndex===0?'#cfd9ec':C.hero,borderRadius:[4,4,0,0]},
+      label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>p.value}}]});
+}
+// ---------- 图2 完成率（公司=排行；选中站=含/不含烟草对比） ----------
+function renderRate(){
+  const t = document.getElementById('t2');
+  if(SEL === '全公司'){
+    t.textContent = '各站任务完成率（含烟草）';
+    const st = DATA.stations.slice().sort((a,b)=>b.rateTob-a.rateTob);
+    const names = st.map(s=>s.name);
+    const rate = st.map(s=>+(s.rateTob*100).toFixed(1));
+    const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
+    mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+p[0].value+'%'},grid:baseGrid,
+      xAxis:cat(names), yAxis:val('完成率',v=>v+'%'),
+      series:[{type:'bar',data:rate.map((v,i)=>({value:v,itemStyle:{color:colors[i],borderRadius:[4,4,0,0]}})),
+        barWidth:18, label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>p.value+'%'}}]});
+    return;
+  }
+  const s = DATA.stations.find(x=>x.name===SEL);
+  t.textContent = SEL + ' · 完成率（含烟草 vs 不含烟草）';
+  mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+p[0].value+'%'},grid:baseGrid,
+    xAxis:cat(['含烟草','不含烟草']), yAxis:val('完成率',v=>v+'%'),
+    series:[{type:'bar',data:[+(s.rateTob*100).toFixed(1), +(s.rateNon*100).toFixed(1)],barWidth:44,
+      itemStyle:{color:p=>p.dataIndex===0?C.hero:C.data2,borderRadius:[4,4,0,0]},
+      label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>p.value+'%'}}]});
+}
+// ---------- 图3 趋势(联动) ----------
+function renderTrend(){
+  const t = document.getElementById('t3');
+  t.textContent = SEL==='全公司' ? '各站分会计月销售趋势（含烟草金额）' : SEL + ' · 月度销售趋势（含烟草金额）';
+  const months = DATA.company.monthLabels;
+  const m = DATA.monthly.tob;
+  const series = DATA.stations.map((s,i)=>{
+    const isSel = (SEL===s.name);
+    const dim = (SEL!=='全公司' && !isSel);
+    return {name:s.name, type:'line', smooth:true, symbol:'none',
+      data:m[s.name],
+      lineStyle:{width:isSel?3.4:1.4, color:isSel?C.hero:PALETTE[i%PALETTE.length], opacity:dim?0.18:1},
+      itemStyle:{color:isSel?C.hero:PALETTE[i%PALETTE.length], opacity:dim?0.18:1},
+      z:isSel?10:1, emphasis:{focus:'series'}};
+  });
+  mk('c3',{tooltip:baseTip, legend:{show:false}, grid:{left:60,right:24,top:18,bottom:40},
+    xAxis:cat(months), yAxis:val('元'), series});
+}
+// ---------- 图4 月度（公司=公司月度；选中站=该站月度） ----------
+function renderCompany(){
+  const t = document.getElementById('t4');
+  const months = DATA.company.monthLabels;
+  if(SEL === '全公司'){
+    t.textContent = '全公司月度非油金额与环比（含烟草）';
+    const c = DATA.company;
+    mk('c4',{tooltip:baseTip, legend:{data:['含烟草金额','含烟草环比'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+      grid:Object.assign({},baseGrid,{right:56}), xAxis:cat(months),
+      yAxis:[val('元'),{type:'value',name:'环比',nameTextStyle:{color:C.mut,fontSize:10},
+        axisLine:{show:false},splitLine:{show:false},axisLabel:{color:C.mut,fontSize:11,formatter:v=>(v*100).toFixed(0)+'%'}}],
+      series:[
+        {name:'含烟草金额',type:'bar',data:c.tob,barWidth:20,itemStyle:{color:C.data,borderRadius:[4,4,0,0]}},
+        {name:'含烟草环比',type:'line',yAxisIndex:1,smooth:true,data:c.tobMom,
+          lineStyle:{width:2,color:C.accent},itemStyle:{color:C.accent}}
+      ]});
+    return;
+  }
+  t.textContent = SEL + ' · 月度非油金额与环比（含烟草）';
+  const arr = DATA.monthly.tob[SEL] || [];
+  const mom = arr.map((v,i)=>{ if(i===0) return null; const p=arr[i-1]; if(!p) return null; return (v-p)/p; });
+  mk('c4',{tooltip:baseTip, legend:{data:['月度金额','环比'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+    grid:Object.assign({},baseGrid,{right:56}), xAxis:cat(months),
+    yAxis:[val('元'),{type:'value',name:'环比',nameTextStyle:{color:C.mut,fontSize:10},
+      axisLine:{show:false},splitLine:{show:false},axisLabel:{color:C.mut,fontSize:11,formatter:v=>v==null?'':(v*100).toFixed(0)+'%'}}],
+    series:[
+      {name:'月度金额',type:'bar',data:arr,barWidth:20,itemStyle:{color:C.data,borderRadius:[4,4,0,0]}},
+      {name:'环比',type:'line',yAxisIndex:1,smooth:true,data:mom,
+        lineStyle:{width:2,color:C.accent},itemStyle:{color:C.accent}}
+    ]});
+}
+// ---------- 图5 构成（公司=全公司5类；选中站=该站5类） ----------
+function renderComp(){
+  const t = document.getElementById('t5');
+  let names, vals;
+  if(SEL === '全公司'){
+    t.textContent = '金额构成（含烟草 · 年度累计，万元）';
+    names = DATA.composition.cats; vals = DATA.composition.tob;
+  }else{
+    t.textContent = SEL + ' · 品类构成（年度累计，万元）';
+    names = CAT_DETAIL;
+    vals = CAT_DETAIL.map(c=> Math.round(sum12(DATA.categoryDetail.amount[c][SEL])/1e2)/100);
+  }
+  mk('c5',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#141d38',fontSize:12,fontWeight:600}},
+    color:MODAL_PALETTE,
+    series:[{type:'pie',radius:['42%','68%'],center:['62%','54%'],
+      label:{color:C.txt,fontSize:11,formatter:'{b}\n{c}万'},
+      labelLine:{lineStyle:{color:C.faint}},
+      data:names.map((n,i)=>({name:n,value:vals[i]}))}]});
+}
+// ---------- 图6 双口径（公司=公司；选中站=该站） ----------
+function renderDual(){
+  const t = document.getElementById('t6');
+  let d;
+  if(SEL === '全公司'){
+    t.textContent = '双口径对比（金额 / 毛利，万元）';
+    d = DATA.dual;
+  }else{
+    t.textContent = SEL + ' · 双口径对比（金额 / 毛利，万元）';
+    const m = DATA.monthly;
+    d = {cats:['金额','毛利'],
+      non:[ Math.round(sum12(m.non[SEL])/1e2)/100, Math.round(sum12(m.nonProfit[SEL])/1e2)/100 ],
+      tob:[ Math.round(sum12(m.tob[SEL])/1e2)/100, Math.round(sum12(m.tobProfit[SEL])/1e2)/100 ]};
+  }
+  mk('c6',{tooltip:baseTip, legend:{data:['不含烟草','含烟草'],textStyle:{color:'#141d38',fontSize:12,fontWeight:600},top:2},
+    grid:baseGrid, xAxis:cat(d.cats), yAxis:val('万元'),
+    series:[
+      {name:'不含烟草',type:'bar',data:d.non,barWidth:34,itemStyle:{color:C.data2,borderRadius:[4,4,0,0]}},
+      {name:'含烟草',type:'bar',data:d.tob,barWidth:34,itemStyle:{color:C.data,borderRadius:[4,4,0,0]}}
+    ]});
+}
+
+// ---------- 品类明细（内嵌到主页，4 块：金额堆叠/毛利堆叠/构成饼/合计表） ----------
+function renderDetail(){
+  const isCo = SEL === '全公司';
+  const t = document.getElementById('detailTitle');
+  const sub = document.getElementById('detailSub');
+  const aH = document.getElementById('dAmtH');
+  const pH = document.getElementById('dProfH');
+  const months = DATA.company.monthLabels;
+  const amt = {}, prof = {};
+  if (isCo) {
+    t.textContent = '全公司 · 品类构成与明细';
+    sub.textContent = '5 品类 × 12 会计月 金额/毛利堆叠（公司合计）、年度构成、合计表';
+    aH.textContent = '品类 × 12 月 金额（元，公司合计）';
+    pH.textContent = '品类 × 12 月 毛利（元，公司合计）';
+    for (const c of CAT_DETAIL) {
+      const aArr = new Array(12).fill(0), pArr = new Array(12).fill(0);
+      for (const st of DATA.stations) {
+        const a = DATA.categoryDetail.amount[c][st.name] || [];
+        const p = DATA.categoryDetail.profit[c][st.name] || [];
+        for (let m = 0; m < 12; m++) { aArr[m] += (a[m] || 0); pArr[m] += (p[m] || 0); }
+      }
+      amt[c] = aArr; prof[c] = pArr;
+    }
+  } else {
+    t.textContent = SEL + ' · 品类构成与明细';
+    sub.textContent = '5 品类 × 12 会计月 金额/毛利堆叠、年度构成、合计表';
+    aH.textContent = '品类 × 12 月 金额（元）';
+    pH.textContent = '品类 × 12 月 毛利（元）';
+    for (const c of CAT_DETAIL) {
+      amt[c]  = DATA.categoryDetail.amount[c][SEL] || [];
+      prof[c] = DATA.categoryDetail.profit[c][SEL]  || [];
+    }
+  }
+  mk('dAmt',{tooltip:baseTip, legend:{textStyle:{color:'#141d38',fontSize:12,fontWeight:600}, top:6},
+    grid:{left:54,right:22,top:38,bottom:46},
+    xAxis:cat(months), yAxis:val('元'),
+    series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'a',data:amt[c],barMaxWidth:24,
+      itemStyle:{color:MODAL_PALETTE[i]}}))});
+  mk('dProf',{tooltip:baseTip, legend:{textStyle:{color:'#141d38',fontSize:12,fontWeight:600}, top:6},
+    grid:{left:54,right:22,top:38,bottom:46},
+    xAxis:cat(months), yAxis:val('元'),
+    series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'p',data:prof[c],barMaxWidth:24,
+      itemStyle:{color:MODAL_PALETTE[i]}}))});
+  const vals = CAT_DETAIL.map(c => Math.round(sum12(amt[c])/1e2)/100);
+  mk('dPie',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#141d38',fontSize:12,fontWeight:600}},
+    color:MODAL_PALETTE,
+    series:[{type:'pie',radius:['40%','66%'],center:['58%','54%'],
+      label:{color:C.txt,fontSize:11,formatter:'{b}\n{c}万'},
+      labelLine:{lineStyle:{color:C.faint}},
+      data:CAT_DETAIL.map((n,i)=>({name:n,value:vals[i]}))}]});
+  const rows = CAT_DETAIL.map(c=>{
+    const a = Math.round(sum12(amt[c])/1e2)/100, p = Math.round(sum12(prof[c])/1e2)/100;
+    return `<tr><td>${c}</td><td class="r">${a.toLocaleString()}</td><td class="r">${p.toLocaleString()}</td></tr>`;
+  }).join('');
+  const ta = Math.round(CAT_DETAIL.reduce((s,c)=>s+sum12(amt[c]),0)/1e2)/100;
+  const tp = Math.round(CAT_DETAIL.reduce((s,c)=>s+sum12(prof[c]),0)/1e2)/100;
+  document.getElementById('dTable').innerHTML =
+    `<tr><th>品类</th><th>金额（万元）</th><th>毛利（万元）</th></tr>` + rows +
+    `<tr class="tot"><td>合计</td><td class="r">${ta.toLocaleString()}</td><td class="r">${tp.toLocaleString()}</td></tr>`;
+}
+
+// ---------- 渲染总入口 ----------
+function renderAll(){
+  charts.forEach(c=>c.dispose()); charts.length=0;
+  renderKPI(); renderRank(); renderRate(); renderTrend(); renderCompany(); renderComp(); renderDual();
+  renderDetail();
+  document.getElementById('upd').textContent = '数据生成于 ' + DATA.generatedAt + ' · 当前视角：' + SEL;
+}
+
+// ---------- 站点选择器 ----------
+function buildChips(){
+  const box = document.getElementById('stations');
+  const all = document.createElement('div');
+  all.className='chip all'+(SEL==='全公司'?' active':'');
+  all.textContent='全公司'; all.onclick=()=>{SEL='全公司';syncChips();renderAll();};
+  box.appendChild(all);
+  DATA.stations.forEach(s=>{
+    const c=document.createElement('div');
+    c.className='chip'+(SEL===s.name?' active':''); c.textContent=s.name;
+    c.onclick=()=>{SEL=s.name;syncChips();renderAll();};
+    box.appendChild(c);
+  });
+}
+function syncChips(){ document.querySelectorAll('#stations .chip').forEach(c=>{
+  c.classList.toggle('active', (c.classList.contains('all')&&SEL==='全公司') || c.textContent===SEL); }); }
+
+// 图1/图2 柱体点击 -> 选中该站 (联动)
+function bindChartClick(){
+  ['c1','c2'].forEach(id=>{
+    const c = echarts.getInstanceByDom(document.getElementById(id));
+    if(c) c.on('click', p=>{ if(p.name && DATA.stations.some(s=>s.name===p.name)){ SEL=p.name; syncChips(); renderAll(); }});
+  });
+}
+
+buildChips();
+renderAll();
+bindChartClick();
 window.addEventListener('resize',()=>charts.forEach(c=>c.resize()));
 </script>
 </body>
 </html>
 """
 
-HTML = HTML.replace("__DATA__", json.dumps(DATA, ensure_ascii=False))
-with open(OUT, "w", encoding="utf-8") as f:
-    f.write(HTML)
-print("✅ 已生成:", OUT)
-print("   数据规模: 站点", len(stations), "站 | 趋势", len(trend_stations), "站×",
-      len(month_labels), "月 | 饼", len(pie), "类 | 双口径", len(dual["cats"]), "项")
+
+def render(data, out_path=INDEX):
+    html = HTML.replace("__DATA__", json.dumps(data, ensure_ascii=False))
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    return out_path
+
+
+def main():
+    if "--from-json" in sys.argv and os.path.exists(DATA_JSON):
+        with open(DATA_JSON, encoding="utf-8") as f:
+            data = json.load(f)
+        print("▶ 仅从 data.json 重渲染 index.html")
+    else:
+        data = build_data()
+        with open(DATA_JSON, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=1)
+        print("▶ 已从 Excel 提取数据 -> data.json")
+    render(data)
+    print("✅ 已生成:", INDEX)
+    print("   站点", len(data["stations"]), "站 | 趋势", len(data["monthly"]["tob"]),
+          "站 | 构成", len(data["composition"]["cats"]), "类 | 品类明细",
+          len(data["categoryDetail"]["cats"]), "类×", len(data["categoryDetail"]["amount"]["汽车用品"]), "站×12月")
+    print("   公司累计(含烟草):", data["totals"]["tobAmount"], "万 | 毛利:",
+          data["totals"]["tobProfit"], "万 | 任务:", data["taskTotal"], "万")
+
+
+if __name__ == "__main__":
+    main()
