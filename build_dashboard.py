@@ -633,21 +633,37 @@ function renderCompany(){
 // ---------- 图5 构成（公司=全公司5类；选中站=该站5类） ----------
 function renderComp(){
   const t = document.getElementById('t5');
-  let names, vals;
+  let names, vals, profits;
   if(SEL === '全公司'){
     t.textContent = '金额构成（含烟草 · 年度累计，万元）';
     names = DATA.composition.cats; vals = DATA.composition.tob;
+    // 公司级各品类毛利 = 各站该品类年度毛利合计
+    profits = names.map(c=> Math.round(
+      DATA.stations.reduce((s,st)=> s+sum12(DATA.categoryDetail.profit[c][st.name]||[]), 0)/1e2)/100);
   }else{
     t.textContent = SEL + ' · 品类构成（年度累计，万元）';
     names = CAT_DETAIL;
     vals = CAT_DETAIL.map(c=> Math.round(sum12(DATA.categoryDetail.amount[c][SEL])/1e2)/100);
+    profits = CAT_DETAIL.map(c=> Math.round(sum12(DATA.categoryDetail.profit[c][SEL])/1e2)/100);
   }
-  mk('c5',{tooltip:tipItem, legend:{orient:'vertical',left:'left',textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}},
+  const data = names.map((n,i)=>{
+    const amt = vals[i], prof = profits[i];
+    const rate = amt ? (prof/amt*100) : 0;
+    return {name:n, value:amt, profit:prof, rate:rate};
+  });
+  mk('c5',{tooltip:{...tipItem, formatter:p=>{
+      const d=p.data;
+      return d.name+'<br>金额：'+fmt2(d.value)+' 万<br>毛利：'+fmt2(d.profit)+' 万<br>毛利率：'+Number(d.rate).toFixed(2)+'%';
+    }},
+    legend:{orient:'vertical',left:'left',textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}},
     color:MODAL_PALETTE,
     series:[{type:'pie',radius:['42%','68%'],center:['62%','54%'],
-      label:{color:C.txt,fontSize:11,formatter:'{b}\n{c}万'},
+      label:{color:C.txt,fontSize:10.5,formatter:p=>{
+        const d=p.data;
+        return d.name+'\n'+num2(d.value)+'万 · 毛利 '+num2(d.profit)+'万 ('+Number(d.rate).toFixed(1)+'%)';
+      }},
       labelLine:{lineStyle:{color:C.faint}},
-      data:names.map((n,i)=>({name:n,value:vals[i]}))}]});
+      data:data}]});
 }
 // ---------- 图6 双口径（公司=公司；选中站=该站） ----------
 function renderDual(){
