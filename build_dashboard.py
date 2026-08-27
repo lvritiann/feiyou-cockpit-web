@@ -345,7 +345,7 @@ if (typeof echarts === 'undefined') {
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);font-family:'Inter','Microsoft YaHei','PingFang SC',sans-serif;
     padding:26px 22px 40px;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:1480px;margin:0 auto}
+  .wrap{max-width:none;margin:0 auto;width:100%}
   header{margin-bottom:18px}
   header h1{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
   header p{color:var(--mut);font-size:12.5px;margin-top:5px}
