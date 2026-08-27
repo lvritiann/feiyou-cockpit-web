@@ -344,7 +344,7 @@ if (typeof echarts === 'undefined') {
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);font-family:'Inter','Microsoft YaHei','PingFang SC',sans-serif;
-    padding:26px 22px 40px;-webkit-font-smoothing:antialiased}
+    padding:14px 10px 24px;-webkit-font-smoothing:antialiased}
   .wrap{max-width:none;margin:0 auto;width:100%}
   header{margin-bottom:18px}
   header h1{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
@@ -369,19 +369,21 @@ if (typeof echarts === 'undefined') {
   .kpi .s{font-size:11.5px;color:var(--good);margin-top:3px}
 
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  @media(min-width:1500px){.grid{grid-template-columns:repeat(3,1fr)}}
   @media(max-width:980px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+  .stack{display:flex;flex-direction:column;gap:14px;margin-top:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px 8px}
   .card.wide{grid-column:1/-1}
   .card h3{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;padding-left:8px;border-left:3px solid var(--data)}
   .card .sub{font-size:11px;color:var(--faint);margin-bottom:8px;padding-left:8px}
-  .chart{width:100%;height:330px}
-  .chart.tall{height:380px}
+  .chart{width:100%;height:390px}
+  .chart.tall{height:450px}
   footer{margin-top:18px;color:var(--faint);font-size:11px;text-align:center;line-height:1.6}
 
   .m-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .m-card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 12px 6px}
   .m-card h4{font-size:12.5px;color:var(--ink);font-weight:600;margin-bottom:4px;padding-left:8px;border-left:3px solid var(--data2)}
-  .m-chart{width:100%;height:270px}
+  .m-chart{width:100%;height:300px}
   .m-table{width:100%;border-collapse:collapse;font-size:12px}
   .m-table th,.m-table td{border:1px solid var(--line);padding:7px 10px;text-align:left}
   .m-table th{background:#22304a;color:#eef2ff;font-weight:600}
@@ -443,6 +445,12 @@ if (typeof echarts === 'undefined') {
       <div class="sub">万元 · 各站累计毛利降序</div><div id="c9" class="chart"></div></div>
     <div class="card"><h3 id="t10">毛利率排名（含烟草 · 年度累计）</h3>
       <div class="sub">% · 各站累计毛利率降序 · 红线=23.5% 公司红线</div><div id="c10" class="chart"></div></div>
+    <div class="card"><h3 id="t5">金额构成（含烟草 · 年度累计，万元）</h3>
+      <div class="sub">汽车用品 / 便利百货 / 香烟零售 / 烟草批发 / 咖啡</div><div id="c5" class="chart"></div></div>
+    <div class="card"><h3 id="t6">双口径对比（金额 / 毛利，万元）</h3>
+      <div class="sub">含烟草 vs 不含烟草</div><div id="c6" class="chart"></div></div>
+  </div>
+  <div class="stack">
     <div class="card wide"><h3 id="t3">各站分会计月销售趋势（含烟草金额）</h3>
       <div class="sub">元 · 选中单站时该站加粗高亮、其余淡显；选「全公司」则均衡展示</div><div id="c3" class="chart tall"></div></div>
     <div class="card wide"><h3 id="t7">近30天日变化 · 非油销售额（含烟草）</h3>
@@ -451,18 +459,14 @@ if (typeof echarts === 'undefined') {
       <div class="sub">元/日 · 最新30天 · 选「全公司」看公司合计，选中站看该站</div><div id="c8" class="chart"></div></div>
     <div class="card wide"><h3 id="t4">全公司月度非油金额与环比（含烟草）</h3>
       <div class="sub">柱=月度金额(元) · 线=环比(%)</div><div id="c4" class="chart"></div></div>
-    <div class="card"><h3 id="t5">金额构成（含烟草 · 年度累计，万元）</h3>
-      <div class="sub">汽车用品 / 便利百货 / 香烟零售 / 烟草批发 / 咖啡</div><div id="c5" class="chart"></div></div>
-    <div class="card"><h3 id="t6">双口径对比（金额 / 毛利，万元）</h3>
-      <div class="sub">含烟草 vs 不含烟草</div><div id="c6" class="chart"></div></div>
   </div>
 
   <div class="card wide" style="margin-top:14px">
     <h3 id="detailTitle">品类构成与明细</h3>
     <div class="sub" id="detailSub" style="margin-bottom:10px">5 品类 × 12 会计月 金额/毛利堆叠、合计表（品类构成见上方「金额构成」卡）</div>
     <div class="m-grid">
-      <div class="m-card"><h4 id="dAmtH">品类 × 12 月 金额（元）</h4><div id="dAmt" class="m-chart" style="height:280px"></div></div>
-      <div class="m-card"><h4 id="dProfH">品类 × 12 月 毛利（元）</h4><div id="dProf" class="m-chart" style="height:280px"></div></div>
+      <div class="m-card"><h4 id="dAmtH">品类 × 12 月 金额（元）</h4><div id="dAmt" class="m-chart" style="height:320px"></div></div>
+      <div class="m-card"><h4 id="dProfH">品类 × 12 月 毛利（元）</h4><div id="dProf" class="m-chart" style="height:320px"></div></div>
       <div class="m-card" style="grid-column:1/-1"><h4>金额 / 毛利 年度合计（万元）</h4>
         <div style="overflow:auto"><table class="m-table" id="dTable"></table></div></div>
     </div>
@@ -475,7 +479,7 @@ if (typeof echarts === 'undefined') {
     <div class="card wide">
       <h3>全年预测 · 双情景对比（毛利红线 23.5% vs 24%）</h3>
       <div class="sub">单位：万元 · 23.5%=守住公司整体毛利红线情景 · 24%=提高红线情景（烟草去化更保守）</div>
-      <div id="fc1" class="chart tall" style="height:360px"></div>
+      <div id="fc1" class="chart tall" style="height:400px"></div>
     </div>
     <div class="card wide" style="margin-top:14px">
       <h3>销量任务超额（双情景）</h3>
