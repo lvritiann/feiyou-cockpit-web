@@ -167,14 +167,28 @@ def build_data():
         comp5.append(round(total / 1e4, 2))
     composition = {"cats": CAT_DETAIL, "tob": comp5}
 
-    # 双口径 + 公司总额: 各块合计行 N 列
-    n_tob = total_row(cd, b1); n_non = total_row(cd, b2)
-    n_tobp = total_row(cd, b3); n_nonp = total_row(cd, b4)
+    # 双口径 + 公司总额: 直接读「按日汇总」(已对齐权威源) 会计年累计，
+    # 保证网页年度总额与驾驶舱周/日简报一致(均源自按日汇总)，不再受图表数据源(原始填报汇总)漂移影响。
+    _Y0 = datetime.datetime(2025, 12, 26)
+    def _ytd(col):
+        s = 0.0
+        for _r in range(4, dd.max_row + 1):
+            _a = dd.cell(_r, 1).value
+            if not isinstance(_a, datetime.datetime) or _a < _Y0:
+                continue
+            _v = dd.cell(_r, col).value
+            if isinstance(_v, (int, float)):
+                s += _v
+        return s
+    _tob_amt = _ytd(17)                       # Q 公司合计金额(含烟草)
+    _tob_pro = _ytd(33)                       # AG 公司合计毛利(含烟草)
+    _non_amt = _ytd(34) + _ytd(35) + _ytd(37) # AH汽车+AI便利+AK咖啡 金额(不含烟草)
+    _non_pro = _ytd(38) + _ytd(39) + _ytd(44) # AL汽车+AM便利+AR咖啡 毛利(不含烟草)
     totals = {
-        "tobAmount": round((cd.cell(n_tob, 14).value or 0) / 1e4, 2),
-        "nonAmount": round((cd.cell(n_non, 14).value or 0) / 1e4, 2),
-        "tobProfit": round((cd.cell(n_tobp, 14).value or 0) / 1e4, 2),
-        "nonProfit": round((cd.cell(n_nonp, 14).value or 0) / 1e4, 2),
+        "tobAmount": round(_tob_amt / 1e4, 2),
+        "nonAmount": round(_non_amt / 1e4, 2),
+        "tobProfit": round(_tob_pro / 1e4, 2),
+        "nonProfit": round(_non_pro / 1e4, 2),
     }
     dual = {
         "cats": ["金额", "毛利"],
@@ -495,8 +509,8 @@ if (typeof echarts === 'undefined') {
 </div>
 
 <script>
-const DATA = __DATA__;
-const CAT_DETAIL = DATA.composition.cats;   // 5 品类（不含非油合计）
+let DATA = null;
+let CAT_DETAIL = [];
 const C = { ink:'#eef2ff', txt:'#d7e0f0', mut:'#8fa1c5', faint:'#64748b', grid:'#2b3752',
             data:'#3b82f6', data2:'#60a5fa', hero:'#ffffff', sheet:'#162032' };
 const PALETTE = ['#ef4444','#3b82f6','#facc15','#06b6d4','#ec4899','#22c55e','#a855f7','#f97316',
@@ -920,13 +934,14 @@ function bindChartClick(){
   });
 }
 
-buildChips();
-renderAll();
-bindChartClick();
 document.querySelectorAll('#tabs .tab').forEach(t=>{
   t.addEventListener('click', ()=>switchView(t.dataset.view));
 });
 window.addEventListener('resize',()=>charts.forEach(c=>c.resize()));
+function boot(){ buildChips(); renderAll(); bindChartClick(); }
+fetch('data.json', {cache:'no-store'}).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(d=>{ DATA=d; CAT_DETAIL=(d.composition&&d.composition.cats)||[]; boot(); })
+  .catch(e=>{ const u=document.getElementById('upd'); if(u) u.textContent='⚠️ 数据加载失败: '+e; });
 </script>
 </body>
 </html>
