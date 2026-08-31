@@ -195,6 +195,10 @@ const tipItem = {trigger:'item', backgroundColor:'#ffffff', borderWidth:0, paddi
 const baseGrid = {left:54,right:22,top:30,bottom:46};
 const cat = d => ({type:'category',data:d,axisLine:{lineStyle:{color:C.grid}},
   axisTick:{show:false}, axisLabel:{color:C.mut,fontSize:11}});
+// 站名类目轴：强制显示全部标签 + 旋转 30° 避免 15 站名重叠截断（排行/完成率图专用）
+const catRot = d => ({type:'category',data:d,axisLine:{lineStyle:{color:C.grid}},
+  axisTick:{show:false}, axisLabel:{color:C.mut,fontSize:11,interval:0,rotate:30,hideOverlap:false}});
+const rankGrid = {left:54,right:24,top:34,bottom:54,containLabel:true};
 const val = (name,fmt) => ({type:'value',name:name,nameTextStyle:{color:C.mut,fontSize:10},
   axisLine:{show:false},splitLine:{lineStyle:{color:C.grid}},axisLabel:{color:C.mut,fontSize:11,formatter:fmt}});
 
@@ -235,7 +239,7 @@ function renderRank(){
     const names = st.map(s=>s.name), task = st.map(s=>s.yearTask), done = st.map(s=>s.compTob);
     const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
     mk('c1',{tooltip:baseTip,legend:{data:['年任务','累计完成'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
-      grid:baseGrid, xAxis:cat(names), yAxis:val('万元'),
+      grid:rankGrid, xAxis:catRot(names), yAxis:val('万元'),
       series:[
         {name:'年任务',type:'bar',data:task,barWidth:13,itemStyle:{color:'#475569',borderRadius:[4,4,0,0]}},
         {name:'累计完成',type:'bar',data:done,barWidth:13,
@@ -260,8 +264,8 @@ function renderRate(){
     const names = st.map(s=>s.name);
     const rate = st.map(s=>+(s.rateTob*100).toFixed(2));
     const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
-    mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+Number(p[0].value).toFixed(2)+'%'},grid:baseGrid,
-      xAxis:cat(names), yAxis:val('完成率',v=>v+'%'),
+    mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+Number(p[0].value).toFixed(2)+'%'},grid:rankGrid,
+      xAxis:catRot(names), yAxis:val('完成率',v=>v+'%'),
       series:[{type:'bar',data:rate.map((v,i)=>({value:v,itemStyle:{color:colors[i],borderRadius:[4,4,0,0]}})),
         barWidth:18, label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>Number(p.value).toFixed(2)+'%'}}]});
     return;
