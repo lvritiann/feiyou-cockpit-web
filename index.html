@@ -343,21 +343,23 @@ function renderComp(){
     vals = CAT_DETAIL.map(c=> Math.round(sum12(DATA.categoryDetail.amount[c][SEL])/1e2)/100);
     profits = CAT_DETAIL.map(c=> Math.round(sum12(DATA.categoryDetail.profit[c][SEL])/1e2)/100);
   }
+  const total = vals.reduce((s,v)=>s+(v||0),0) || 1;
   const data = names.map((n,i)=>{
     const amt = vals[i], prof = profits[i];
     const rate = amt ? (prof/amt*100) : 0;
-    return {name:n, value:amt, profit:prof, rate:rate};
+    const pct  = amt ? (amt/total*100) : 0;
+    return {name:n, value:amt, profit:prof, rate:rate, pct:pct};
   });
   mk('c5',{tooltip:{...tipItem, formatter:p=>{
       const d=p.data;
-      return d.name+'<br>金额：'+fmt2(d.value)+' 万<br>毛利：'+fmt2(d.profit)+' 万<br>毛利率：'+Number(d.rate).toFixed(2)+'%';
+      return d.name+'<br>金额：'+fmt2(d.value)+' 万<br>占全年：'+Number(d.pct).toFixed(1)+'%<br>毛利：'+fmt2(d.profit)+' 万<br>毛利率：'+Number(d.rate).toFixed(2)+'%';
     }},
     legend:{orient:'vertical',left:'left',textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}},
     color:MODAL_PALETTE,
     series:[{type:'pie',radius:['42%','68%'],center:['62%','54%'],
       label:{color:C.txt,fontSize:10.5,formatter:p=>{
         const d=p.data;
-        return d.name+'\n'+num2(d.value)+'万 · 毛利 '+num2(d.profit)+'万 ('+Number(d.rate).toFixed(1)+'%)';
+        return d.name+'\n'+num2(d.value)+'万 · 占'+Number(d.pct).toFixed(1)+'% · 毛利 '+num2(d.profit)+'万 ('+Number(d.rate).toFixed(1)+'%)';
       }},
       labelLine:{lineStyle:{color:C.faint}},
       data:data}]});
@@ -495,25 +497,52 @@ function renderDetail(){
       prof[c] = DATA.categoryDetail.profit[c][SEL]  || [];
     }
   }
-  mk('dAmt',{tooltip:baseTip, legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6},
+  // 各品类全年合计 & 占总额比例（用于图例标注 + 合计表）
+  const annA = {}, annP = {};
+  CAT_DETAIL.forEach(c=>{ annA[c]=sum12(amt[c]); annP[c]=sum12(prof[c]); });
+  const totA = CAT_DETAIL.reduce((s,c)=>s+annA[c],0) || 1;
+  const totP = CAT_DETAIL.reduce((s,c)=>s+annP[c],0) || 1;
+  const pctA = c => (annA[c]/totA*100);
+  const pctP = c => (annP[c]/totP*100);
+
+  // 金额堆叠：图例标全年占比%，tooltip 补当月占比%
+  mk('dAmt',{tooltip:{...baseTip, formatter:ps=>{
+      const idx = ps[0].dataIndex;
+      const mTot = CAT_DETAIL.reduce((s,c)=>s+(amt[c][idx]||0),0) || 1;
+      let h = ps[0].name+'<br>';
+      ps.forEach(x=>{ const v=x.value||0; h+=x.marker+x.seriesName+'：'+fmt2(v)+' 元（当月 '+(v/mTot*100).toFixed(1)+'%）'+'<br>'; });
+      return h;
+    }},
+    legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6,
+      formatter:name=>name+' '+pctA(name).toFixed(1)+'%'},
     grid:{left:54,right:22,top:38,bottom:46},
     xAxis:cat(months), yAxis:val('元'),
     series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'a',data:amt[c],barMaxWidth:24,
       itemStyle:{color:MODAL_PALETTE[i]}}))});
-  mk('dProf',{tooltip:baseTip, legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6},
+  // 毛利堆叠：图例标全年占比%，tooltip 补当月占比%
+  mk('dProf',{tooltip:{...baseTip, formatter:ps=>{
+      const idx = ps[0].dataIndex;
+      const mTot = CAT_DETAIL.reduce((s,c)=>s+(prof[c][idx]||0),0) || 1;
+      let h = ps[0].name+'<br>';
+      ps.forEach(x=>{ const v=x.value||0; h+=x.marker+x.seriesName+'：'+fmt2(v)+' 元（当月 '+(v/mTot*100).toFixed(1)+'%）'+'<br>'; });
+      return h;
+    }},
+    legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6,
+      formatter:name=>name+' '+pctP(name).toFixed(1)+'%'},
     grid:{left:54,right:22,top:38,bottom:46},
     xAxis:cat(months), yAxis:val('元'),
     series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'p',data:prof[c],barMaxWidth:24,
       itemStyle:{color:MODAL_PALETTE[i]}}))});
+
+  const ta = Math.round(totA/1e2)/100;
+  const tp = Math.round(totP/1e2)/100;
   const rows = CAT_DETAIL.map(c=>{
-    const a = Math.round(sum12(amt[c])/1e2)/100, p = Math.round(sum12(prof[c])/1e2)/100;
-    return `<tr><td>${c}</td><td class="r">${fmt2(a)}</td><td class="r">${fmt2(p)}</td></tr>`;
+    const a = Math.round(annA[c]/1e2)/100, p = Math.round(annP[c]/1e2)/100;
+    return `<tr><td>${c}</td><td class="r">${fmt2(a)}</td><td class="r">${pctA(c).toFixed(1)}%</td><td class="r">${fmt2(p)}</td><td class="r">${pctP(c).toFixed(1)}%</td></tr>`;
   }).join('');
-  const ta = Math.round(CAT_DETAIL.reduce((s,c)=>s+sum12(amt[c]),0)/1e2)/100;
-  const tp = Math.round(CAT_DETAIL.reduce((s,c)=>s+sum12(prof[c]),0)/1e2)/100;
   document.getElementById('dTable').innerHTML =
-    `<tr><th>品类</th><th>金额（万元）</th><th>毛利（万元）</th></tr>` + rows +
-    `<tr class="tot"><td>合计</td><td class="r">${fmt2(ta)}</td><td class="r">${fmt2(tp)}</td></tr>`;
+    `<tr><th>品类</th><th>金额（万元）</th><th>金额占比</th><th>毛利（万元）</th><th>毛利占比</th></tr>` + rows +
+    `<tr class="tot"><td>合计</td><td class="r">${fmt2(ta)}</td><td class="r">100%</td><td class="r">${fmt2(tp)}</td><td class="r">100%</td></tr>`;
 }
 
 // ---------- 渲染总入口 ----------
