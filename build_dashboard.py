@@ -33,6 +33,29 @@ CAT_DETAIL_ALL = CAT_DETAIL + ["非油合计"]
 TASK_TOTAL = 1130  # 全年任务(万元)
 
 
+def _num(v):
+    """把单元格值安全转成 float。
+
+    背景(2026-09-10 实测)：「按日汇总」第 4 行(=2025-12-26 手修行)的整行数值
+    被以 opType:"formula" 写成了纯数字公式串，如 '=22084.02'。openpyxl 以
+    data_only=False 读取时返回的是字符串 '=22084.02'，`isinstance(v,(int,float))`
+    判定失败 → 该行被静默跳过，导致公司年度累计少了 22,084.02 元
+    (网页显示 977.76万 vs 驾驶舱权威 979.97万)。
+    故数值读取一律走本函数，兼容 数字 / '123' / '=123' 三种形态。
+    """
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return float(v)
+    if isinstance(v, str):
+        s = v.strip()
+        if s.startswith("="):
+            s = s[1:].strip()
+        try:
+            return float(s)
+        except Exception:
+            return None
+    return None
+
+
 def load_excel():
     import openpyxl
     return openpyxl.load_workbook(DASH, data_only=False)
@@ -176,8 +199,8 @@ def build_data():
             _a = dd.cell(_r, 1).value
             if not isinstance(_a, datetime.datetime) or _a < _Y0:
                 continue
-            _v = dd.cell(_r, col).value
-            if isinstance(_v, (int, float)):
+            _v = _num(dd.cell(_r, col).value)
+            if _v is not None:
                 s += _v
         return s
     _tob_amt = _ytd(17)                       # Q 公司合计金额(含烟草)
@@ -226,8 +249,8 @@ def build_daily30(ws):
         d = ws.cell(r, 1).value
         if not isinstance(d, (_dt.datetime, _dt.date)):
             continue
-        amt_total = ws.cell(r, 17).value
-        if isinstance(amt_total, (int, float)) and amt_total > 0:
+        amt_total = _num(ws.cell(r, 17).value)
+        if amt_total is not None and amt_total > 0:
             rows.append(r)
     if not rows:
         return {"dates": [], "amount": {}, "profit": {}}

@@ -2890,19 +2890,19 @@
    "毛利"
   ],
   "tob": [
-   977.76,
-   236.36
+   979.97,
+   237.37
   ],
   "non": [
-   625.43,
-   215.81
+   627.04,
+   216.74
   ]
  },
  "totals": {
-  "tobAmount": 977.76,
-  "nonAmount": 625.43,
-  "tobProfit": 236.36,
-  "nonProfit": 215.81
+  "tobAmount": 979.97,
+  "nonAmount": 627.04,
+  "tobProfit": 237.37,
+  "nonProfit": 216.74
  },
  "forecast": {
   "asOf": "2026-09-10",
