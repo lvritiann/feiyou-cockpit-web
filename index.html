@@ -583,15 +583,38 @@ function renderForecast(){
   const fc = DATA.forecast || {};
   const k = fc.kpis || {};
   const ex = fc.extra || {};
-  // KPI
+  // KPI —— 主数字 = 全年预计；副标题 = 已完成的实际数（截至 asOf）
+  const sc2 = fc.scenarios || {labels:[], A:[], B:[]};
+  const task = Number(fc.task) || 1130;
+  const natCum = k['自然口径累计万'];
+  const cumInc = k['累计含去化销售额万'];
+  const S0 = (k['自然口径全年万']!=null) ? Number(k['自然口径全年万'])
+           : ((sc2.A[2]!=null && sc2.A[0]!=null) ? sc2.A[2]-sc2.A[0] : null);
+  const cumGp = (k['累计毛利万']!=null) ? Number(k['累计毛利万'])
+              : ((k['整体毛利率']!=null && cumInc!=null) ? Number(k['整体毛利率'])/100*Number(cumInc) : null);
+  const cumQu = (k['累计去化额万']!=null) ? Number(k['累计去化额万'])
+              : ((cumInc!=null && natCum!=null) ? Number(cumInc)-Number(natCum) : null);
+  const remPred = (k['剩余预测万']!=null) ? Number(k['剩余预测万'])
+              : ((S0!=null && natCum!=null && k['华山扣除万']!=null) ? S0-Number(natCum)+Number(k['华山扣除万']) : null);
+  const ratePlan = (S0!=null) ? S0/task*100 : null;
+  const rateReal = (natCum!=null) ? Number(natCum)/task*100 : null;
+  const N = v => (v==null || !isFinite(v)) ? '—' : Number(v).toFixed(2);
   const cards = [
-    {k:'累计含去化销售额', v:k['累计含去化销售额万']==null?'—':Number(k['累计含去化销售额万']).toFixed(2), u:'万', s:'含烟草批发去化口径'},
-    {k:'自然口径累计', v:k['自然口径累计万']==null?'—':Number(k['自然口径累计万']).toFixed(2), u:'万', s:'不含烟草批发的自然经营口径'},
-    {k:'整体毛利率', v:k['整体毛利率']==null?'—':Number(k['整体毛利率']).toFixed(2), u:'%', s:'当前累计毛利 ÷ 累计销售额'},
-    {k:'华山站停业扣除', v:k['华山扣除万']==null?'—':Number(k['华山扣除万']).toFixed(2), u:'万', s:'10/15–12/25 停业预测损失'},
+    {k:'预计全年 · 自然口径', v:N(S0), u:'万',
+     s:(remPred!=null && k['华山扣除万']!=null)
+        ? `实际累计 ${N(natCum)} 万 ＋ 剩余预测 ${N(remPred)} 万 − 华山扣除 ${N(k['华山扣除万'])} 万`
+        : `实际累计 ${N(natCum)} 万`},
+    {k:'预计任务达成率 · 自然口径', v:(ratePlan==null?'—':ratePlan.toFixed(2)), u:'%',
+     warn:(ratePlan!=null && ratePlan<100),
+     s:`实际进度 ${rateReal==null?'—':rateReal.toFixed(2)}% · 距 ${task} 万任务还差 ${N(S0==null?null:task-S0)} 万`},
+    {k:'预计全年公司毛利', v:N(sc2.A[3]), u:'万',
+     s:`实际累计 ${N(cumGp)} 万 · 预计毛利率 23.50%（守住红线情景）`},
+    {k:'预计期末香烟库存', v:N(sc2.A[4]), u:'万',
+     s:`当前 ${N(ex['当前香烟库存万'])} 万 · 全年去化 ${N(sc2.A[0])} 万（已去化 ${N(cumQu)} 万）`},
   ];
   document.getElementById('fcKpis').innerHTML = cards.map(c=>
-    `<div class="fc-kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
+    `<div class="fc-kpi"><div class="k">${c.k}</div><div class="v"${c.warn?' style="color:#ef4444"':''}>${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('')
+    + `<div class="note" style="grid-column:1/-1;margin-top:0">卡片<b>主数字 = 全年预计</b>，副标题 = 已完成的实际数（截至 ${fc.asOf||'—'}）。达成率按<b>自然经营口径</b>（不含烟草批发去化）对全年 ${task} 万任务；含去化的全口径超额率见下方「销量任务超额」图。</div>`;
 
   // 双情景对比图
   const sc = fc.scenarios || {labels:[], A:[], B:[]};
