@@ -29,6 +29,13 @@ if (typeof echarts === 'undefined') {
   header p.byline{color:var(--faint);font-size:11px;margin-top:3px}
   .upd{color:var(--faint);font-size:11px;margin-top:2px}
 
+  /* 年度切换器 */
+  .yearbar{display:flex;gap:8px;margin-top:10px}
+  .ytab{padding:7px 18px;border-radius:999px;border:1px solid var(--line);background:var(--card);
+    color:var(--mut);font-size:13px;font-weight:600;cursor:pointer;transition:.18s;user-select:none}
+  .ytab:hover{color:var(--data);border-color:var(--data2)}
+  .ytab.active{background:var(--hero);color:#fff;border-color:var(--hero)}
+
   /* 联动站点选择器 */
   .stations{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 18px}
   .chip{padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--card);
@@ -99,6 +106,10 @@ if (typeof echarts === 'undefined') {
     <h1>陕西高速延长石油有限责任公司非油销售汇总驾驶舱 · 图表视图</h1>
     <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
     <p class="byline">Design by 刘龙伟 · Email: liulongwei@126.com</p>
+    <div class="yearbar" id="yearbar">
+      <div class="ytab active" data-year="2027" title="2027会计年: 2026-12-26 ~ 2027-12-25">2027 · 本年</div>
+      <div class="ytab" data-year="2026" title="2026会计年: 2025-12-26 ~ 2026-12-25 (已归档)">2026 · 上年</div>
+    </div>
     <div class="upd" id="upd"></div>
   </header>
 
@@ -209,22 +220,27 @@ function renderKPI(){
   const t = DATA.totals, task = DATA.taskTotal;
   const stObj = SEL === '全公司' ? null : DATA.stations.find(s => s.name === SEL);
   const comp   = stObj ? stObj.compTob   : t.tobAmount;
-  const rate   = stObj ? stObj.rateTob*100 : (t.tobAmount/task*100);
+  const rate   = stObj ? (stObj.rateTob!=null ? stObj.rateTob*100 : null)
+                       : (task!=null && t.tobAmount!=null ? t.tobAmount/task*100 : null);
   const profit = stObj ? Math.round(sum12(DATA.monthly.tobProfit[SEL])/1e2)/100 : t.tobProfit;
   const profRate = stObj ? (comp ? profit/comp*100 : 0) : (t.tobProfit/t.tobAmount*100);
   const yearTask  = stObj ? stObj.yearTask : task;
-  const subt1 = stObj ? `年任务 ${yearTask}万 · 进度 ${rate.toFixed(2)}%`
-                       : `全年任务 ${task}万 · 进度 ${(t.tobAmount/task*100).toFixed(2)}%`;
+  const noTask = (yearTask==null);
+  const subt1 = stObj ? (noTask ? '任务待下达 · 累计完成 '+ (comp==null?'—':comp.toFixed(2)) +'万'
+                                : `年任务 ${yearTask}万 · 进度 ${rate.toFixed(2)}%`)
+                      : (noTask ? '年度任务待下达' : `全年任务 ${task}万 · 进度 ${(t.tobAmount/task*100).toFixed(2)}%`);
+  const yoyNote = (YEAR==='2027' && DATA.yoy2026) ? ' · 对比2026同期见月度图虚线' : '';
   const cards = [
     {k: stObj ? '本站累计完成(含烟草)' : '累计完成(含烟草)',
-      v: comp==null?'—':comp.toFixed(2), u:'万', s: subt1},
-    {k: '完成率(含烟草)', v: rate==null?'—':rate.toFixed(2), u:'%',
-      s: rate>=100 ? '已达标 ✔' : ((100-rate).toFixed(2)+'% 待完成')},
+      v: comp==null?'—':comp.toFixed(2), u:'万', s: subt1 + yoyNote},
+    {k: '完成率(含烟草)', v: (rate==null||!isFinite(rate))?'—':rate.toFixed(2), u:'%',
+      s: noTask ? '任务待下达' : (rate>=100 ? '已达标 ✔' : ((100-rate).toFixed(2)+'% 待完成'))},
     {k: stObj ? '本站累计毛利(含烟草)' : '累计毛利(含烟草)',
       v: profit==null?'—':profit.toFixed(2), u:'万',
       s: '毛利率 ' + profRate.toFixed(2) + '%'},
     {k: stObj ? '本站年任务' : '全年任务',
-      v: yearTask, u:'万', s: stObj ? '本站任务盘（不含烟草去化）' : '烟草去化已计入'},
+      v: noTask ? '待下达' : yearTask, u: noTask?'':'万',
+      s: noTask ? '任务下达后自动更新' : (stObj ? '本站任务盘（不含烟草去化）' : '烟草去化已计入')},
   ];
   document.getElementById('kpis').innerHTML = cards.map(c=>
     `<div class="kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
@@ -234,21 +250,38 @@ function renderKPI(){
 function renderRank(){
   const t = document.getElementById('t1');
   if(SEL === '全公司'){
-    t.textContent = '各站任务完成排行 · 年任务 vs 累计完成（含烟草）';
-    const st = DATA.stations.slice().sort((a,b)=>b.compTob-a.compTob);
+    const st = DATA.stations.slice().sort((a,b)=>(b.compTob||0)-(a.compTob||0));
+    const hasTask = st.some(s=>s.yearTask!=null);
     const names = st.map(s=>s.name), task = st.map(s=>s.yearTask), done = st.map(s=>s.compTob);
     const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
-    mk('c1',{tooltip:baseTip,legend:{data:['年任务','累计完成'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
-      grid:rankGrid, xAxis:catRot(names), yAxis:val('万元'),
-      series:[
-        {name:'年任务',type:'bar',data:task,barWidth:13,itemStyle:{color:'#475569',borderRadius:[4,4,0,0]}},
-        {name:'累计完成',type:'bar',data:done,barWidth:13,
-          itemStyle:{color:p=>colors[p.dataIndex]!==undefined?colors[p.dataIndex]:C.data,borderRadius:[4,4,0,0]},
-          label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>Number(p.value).toFixed(2)}}
-      ]});
+    if(hasTask){
+      t.textContent = '各站任务完成排行 · 年任务 vs 累计完成（含烟草）';
+      mk('c1',{tooltip:baseTip,legend:{data:['年任务','累计完成'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
+        grid:rankGrid, xAxis:catRot(names), yAxis:val('万元'),
+        series:[
+          {name:'年任务',type:'bar',data:task,barWidth:13,itemStyle:{color:'#475569',borderRadius:[4,4,0,0]}},
+          {name:'累计完成',type:'bar',data:done,barWidth:13,
+            itemStyle:{color:p=>colors[p.dataIndex]!==undefined?colors[p.dataIndex]:C.data,borderRadius:[4,4,0,0]},
+            label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>Number(p.value).toFixed(2)}}
+        ]});
+    }else{
+      t.textContent = '各站累计完成排行（含烟草 · 任务待下达）';
+      mk('c1',{tooltip:baseTip, grid:rankGrid, xAxis:catRot(names), yAxis:val('万元'),
+        series:[{name:'累计完成',type:'bar',data:done,barWidth:18,
+          itemStyle:{color:C.data,borderRadius:[4,4,0,0]},
+          label:{show:true,position:'top',color:C.mut,fontSize:9,formatter:p=>Number(p.value).toFixed(2)}}]});
+    }
     return;
   }
   const s = DATA.stations.find(x=>x.name===SEL);
+  if(s.yearTask==null){
+    t.textContent = SEL + ' · 累计完成（含烟草 · 任务待下达）';
+    mk('c1',{tooltip:baseTip, grid:baseGrid, xAxis:cat(['累计完成']), yAxis:val('万元'),
+      series:[{type:'bar',data:[s.compTob||0],barWidth:44,
+        itemStyle:{color:C.hero,borderRadius:[4,4,0,0]},
+        label:{show:true,position:'top',color:C.mut,fontSize:10,formatter:p=>Number(p.value).toFixed(2)}}]});
+    return;
+  }
   t.textContent = SEL + ' · 任务进度（年任务 vs 累计完成，万元）';
   mk('c1',{tooltip:baseTip, grid:baseGrid, xAxis:cat(['年任务','累计完成']), yAxis:val('万元'),
     series:[{type:'bar',data:[s.yearTask, s.compTob],barWidth:44,
@@ -260,8 +293,17 @@ function renderRate(){
   const t = document.getElementById('t2');
   if(SEL === '全公司'){
     t.textContent = '各站任务完成率（含烟草）';
-    const st = DATA.stations.slice().sort((a,b)=>b.rateTob-a.rateTob);
+    const st = DATA.stations.slice().sort((a,b)=>(b.rateTob||0)-(a.rateTob||0));
+    const hasTask = st.some(s=>s.rateTob!=null);
     const names = st.map(s=>s.name);
+    if(!hasTask){
+      t.textContent = '各站任务完成率（任务待下达）';
+      mk('c2',{tooltip:baseTip, grid:rankGrid, xAxis:catRot(names), yAxis:val('完成率',v=>v+'%'),
+        graphic:{type:'text',left:'center',top:'middle',
+          style:{text:'任务下达后展示各站完成率',fill:'#8fa1c5',fontSize:14}},
+        series:[]});
+      return;
+    }
     const rate = st.map(s=>+(s.rateTob*100).toFixed(2));
     const colors = st.map(s=> s.name===SEL ? C.hero : C.data2);
     mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+Number(p[0].value).toFixed(2)+'%'},grid:rankGrid,
@@ -271,6 +313,14 @@ function renderRate(){
     return;
   }
   const s = DATA.stations.find(x=>x.name===SEL);
+  if(s.rateTob==null){
+    t.textContent = SEL + ' · 完成率（任务待下达）';
+    mk('c2',{tooltip:baseTip, grid:baseGrid, xAxis:cat(['含烟草','不含烟草']), yAxis:val('完成率',v=>v+'%'),
+      graphic:{type:'text',left:'center',top:'middle',
+        style:{text:'任务下达后展示完成率',fill:'#8fa1c5',fontSize:14}},
+      series:[]});
+    return;
+  }
   t.textContent = SEL + ' · 完成率（含烟草 vs 不含烟草）';
   mk('c2',{tooltip:{...baseTip,formatter:p=>p[0].name+'：'+Number(p[0].value).toFixed(2)+'%'},grid:baseGrid,
     xAxis:cat(['含烟草','不含烟草']), yAxis:val('完成率',v=>v+'%'),
@@ -293,6 +343,23 @@ function renderTrend(){
       itemStyle:{color:isSel?C.hero:PALETTE[i%PALETTE.length], opacity:dim?0.18:1},
       z:isSel?10:1, emphasis:{focus:'series'}};
   });
+  // 2026 同期叠加(虚线) —— 仅 2027 视图且存在同比块时
+  const yoy = DATA.yoy2026;
+  if(yoy && YEAR==='2027'){
+    if(SEL==='全公司' && yoy.companyTob){
+      t.textContent = '各站分会计月销售趋势（含烟草 · 金色虚线=2026同期公司合计）';
+      series.push({name:'2026同期·公司合计', type:'line', smooth:true, symbol:'none',
+        data:yoy.companyTob,
+        lineStyle:{width:2.6, color:'#fbbf24', type:'dashed'},
+        itemStyle:{color:'#fbbf24'}, z:11, emphasis:{focus:'series'}});
+    }else if(SEL!=='全公司' && yoy.monthlyTob && yoy.monthlyTob[SEL]){
+      t.textContent = SEL + ' · 月度销售趋势（含烟草 · 金色虚线=2026同期）';
+      series.push({name:'2026同期·'+SEL, type:'line', smooth:true, symbol:'none',
+        data:yoy.monthlyTob[SEL],
+        lineStyle:{width:2.6, color:'#fbbf24', type:'dashed'},
+        itemStyle:{color:'#fbbf24'}, z:11, emphasis:{focus:'series'}});
+    }
+  }
   mk('c3',{tooltip:baseTip, legend:{show:false}, grid:{left:60,right:24,top:18,bottom:40},
     xAxis:cat(months), yAxis:val('元'), series});
 }
@@ -301,17 +368,28 @@ function renderCompany(){
   const t = document.getElementById('t4');
   const months = DATA.company.monthLabels;
   if(SEL === '全公司'){
-    t.textContent = '全公司月度非油金额与环比（含烟草）';
+    const yoy = DATA.yoy2026;
+    const hasYoy = (YEAR==='2027' && yoy && yoy.companyTob);
+    t.textContent = hasYoy ? '全公司月度非油金额与环比（含烟草 · 虚线=2026同期）'
+                           : '全公司月度非油金额与环比（含烟草）';
     const c = DATA.company;
-    mk('c4',{tooltip:baseTip, legend:{data:['含烟草金额','含烟草环比'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
+    const legendData = ['含烟草金额','含烟草环比'];
+    const series = [
+      {name:'含烟草金额',type:'bar',data:c.tob,barWidth:20,itemStyle:{color:C.data,borderRadius:[4,4,0,0]}},
+      {name:'含烟草环比',type:'line',yAxisIndex:1,smooth:true,data:c.tobMom,
+        lineStyle:{width:2,color:C.accent},itemStyle:{color:C.accent}}
+    ];
+    if(hasYoy){
+      legendData.push('2026同期');
+      series.push({name:'2026同期',type:'line',smooth:true,symbol:'circle',symbolSize:5,
+        data:yoy.companyTob,
+        lineStyle:{width:2.2,color:'#fbbf24',type:'dashed'},itemStyle:{color:'#fbbf24'}});
+    }
+    mk('c4',{tooltip:baseTip, legend:{data:legendData,textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
       grid:Object.assign({},baseGrid,{right:56}), xAxis:cat(months),
       yAxis:[val('元'),{type:'value',name:'环比',nameTextStyle:{color:C.mut,fontSize:10},
         axisLine:{show:false},splitLine:{show:false},axisLabel:{color:C.mut,fontSize:11,formatter:v=>(v*100).toFixed(0)+'%'}}],
-      series:[
-        {name:'含烟草金额',type:'bar',data:c.tob,barWidth:20,itemStyle:{color:C.data,borderRadius:[4,4,0,0]}},
-        {name:'含烟草环比',type:'line',yAxisIndex:1,smooth:true,data:c.tobMom,
-          lineStyle:{width:2,color:C.accent},itemStyle:{color:C.accent}}
-      ]});
+      series});
     return;
   }
   t.textContent = SEL + ' · 月度非油金额与环比（含烟草）';
@@ -550,12 +628,15 @@ function renderAll(){
   charts.forEach(c=>c.dispose()); charts.length=0;
   renderKPI(); renderRank(); renderRate(); renderRank2(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
   renderDetail();
-  document.getElementById('upd').textContent = '数据生成于 ' + DATA.generatedAt + ' · 当前视角：' + SEL;
+  document.getElementById('upd').textContent = '数据生成于 ' + DATA.generatedAt
+    + ' · ' + YEAR + ' 会计年（' + (YEAR==='2027' ? '2026-12-26 ~ 2027-12-25' : '2025-12-26 ~ 2026-12-25') + '）'
+    + ' · 当前视角：' + SEL;
 }
 
 // ---------- 站点选择器 ----------
 function buildChips(){
   const box = document.getElementById('stations');
+  box.innerHTML = '';   // 年度切换时重建, 防止累积
   const all = document.createElement('div');
   all.className='chip all'+(SEL==='全公司'?' active':'');
   all.textContent='全公司'; all.onclick=()=>{SEL='全公司';syncChips();renderAll();};
@@ -660,10 +741,68 @@ document.querySelectorAll('#tabs .tab').forEach(t=>{
   t.addEventListener('click', ()=>switchView(t.dataset.view));
 });
 window.addEventListener('resize',()=>charts.forEach(c=>c.resize()));
-function boot(){ buildChips(); renderAll(); bindChartClick(); }
-fetch('data.json', {cache:'no-store'}).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-  .then(d=>{ DATA=d; CAT_DETAIL=(d.composition&&d.composition.cats)||[]; boot(); })
-  .catch(e=>{ const u=document.getElementById('upd'); if(u) u.textContent='⚠️ 数据加载失败: '+e; });
+
+// ---------- 双年度数据层 ----------
+let YEAR = '2027';
+const JSON_BY_YEAR = {'2027':'data.json', '2026':'data_2026.json'};
+const YEAR_CACHE = {};
+
+function syncYearTabs(){
+  document.querySelectorAll('#yearbar .ytab').forEach(t=>
+    t.classList.toggle('active', t.dataset.year===YEAR));
+}
+
+const detectYear = d => (d && d.year==='2027') ? '2027' : '2026';
+
+async function loadYear(y){
+  if(YEAR_CACHE[y]){ DATA = YEAR_CACHE[y]; }
+  else{
+    const r = await fetch(JSON_BY_YEAR[y], {cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    DATA = await r.json();
+    // 按数据自带 year 字段归位缓存: 过渡期 data.json 仍是 2026 数据时,
+    // 点「2027」Tab 会自动落回 2026 视图, 避免数据年份与标签错位。
+    y = detectYear(DATA);
+    YEAR_CACHE[y] = DATA;
+  }
+  CAT_DETAIL = (DATA.composition && DATA.composition.cats) || [];
+  SEL = '全公司';
+  YEAR = y;
+  buildChips(); renderAll(); bindChartClick(); syncYearTabs();
+}
+
+async function switchYear(y){
+  if(y===YEAR && DATA) return;
+  const u = document.getElementById('upd');
+  try{
+    u.textContent = '⏳ 正在加载 ' + y + ' 会计年数据…';
+    await loadYear(y);
+  }catch(e){
+    u.textContent = '⚠️ ' + y + ' 会计年数据暂不可用 (' + e + ')';
+    syncYearTabs();
+  }
+}
+
+function boot(){
+  // 首屏固定读 data.json(="当前会计年"数据, AirScript 推送目标), 再按数据自带年份落视图:
+  // 12-26 切换前 data.json=2026数据 → 自动高亮「2026」; 切换后 AirScript-2027 推送
+  // 带 year:"2027" 的 data.json → 自动高亮「2027」。归档快照 data_2026.json 仅由 Tab 读取。
+  const u = document.getElementById('upd');
+  fetch('data.json', {cache:'no-store'})
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(d=>{
+      const y = (d && d.year==='2027') ? '2027' : '2026';
+      YEAR_CACHE[y] = d;
+      DATA = d; CAT_DETAIL = (d.composition && d.composition.cats) || [];
+      SEL = '全公司'; YEAR = y;
+      buildChips(); renderAll(); bindChartClick(); syncYearTabs();
+    })
+    .catch(e=>{ if(u) u.textContent='⚠️ 数据加载失败: '+e; });
+}
+document.querySelectorAll('#yearbar .ytab').forEach(t=>{
+  t.addEventListener('click', ()=>switchYear(t.dataset.year));
+});
+boot();
 </script>
 </body>
 </html>
