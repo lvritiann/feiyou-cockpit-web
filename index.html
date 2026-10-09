@@ -270,7 +270,7 @@ function renderTrafficKPI(){
     {k: pre + '总服务车次', v: _stripInt(t.tot), u:'车次',
      s: '汽油 ' + _stripInt(t.gas) + ' · 柴油 ' + _stripInt(t.die)},
     {k: pre + '总加油升数', v: (t.vol ? (t.vol/1e4).toFixed(1) : '—'), u:'万升',
-     s: '汽油 ' + (t.gasL ? (t.gasL/1e4).toFixed(1) : '—') + '万 · 柴油 ' + (t.dieL ? (t.dieL/1e4).toFixed(1) : '—') + '万' + (((t.gasL||0)+(t.dieL||0)) ? '<br>约 ' + Math.round(((t.gasL||0)*0.740 + (t.dieL||0)*0.830)/1000).toLocaleString('zh-CN') + ' 吨（密度按汽油0.740、柴油0.830折算）' : '')},
+     s: '汽油 ' + (t.gasL ? (t.gasL/1e4).toFixed(1) : '—') + '万 · 柴油 ' + (t.dieL ? (t.dieL/1e4).toFixed(1) : '—') + '万' + (((t.gasL||0)+(t.dieL||0)) ? '<br>约 ' + Math.round(((t.gasL||0)*0.738 + (t.dieL||0)*0.828)/1000).toLocaleString('zh-CN') + ' 吨（密度按汽油0.738、柴油0.828折算）' : '')},
     {k: pre + '汽油单加升数', v: (t.gasPer==null?'—':t.gasPer), u:'升/单',
      s: '汽油升数 ÷ 汽油车次'},
     {k: pre + '柴油单加升数', v: (t.diePer==null?'—':t.diePer), u:'升/单',
