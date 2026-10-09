@@ -567,6 +567,12 @@ if (typeof echarts === 'undefined') {
 
   <div class="kpis" id="kpis"></div>
 
+  <div style="display:flex;align-items:center;gap:10px;margin:2px 0 12px">
+    <span style="font-size:12.5px;font-weight:600;color:var(--mut)">车流与转化 · 单数统计</span>
+    <span style="flex:1;height:1px;background:var(--line)"></span>
+  </div>
+  <div class="kpis" id="tkpis"></div>
+
   <div class="grid">
     <div class="card"><h3 id="t1">各站任务完成排行 · 年任务 vs 累计完成（含烟草）</h3>
       <div class="sub">万元 · 深色=当前选中站 · 点击柱体可切换选中并查看明细</div><div id="c1" class="chart"></div></div>
@@ -580,6 +586,10 @@ if (typeof echarts === 'undefined') {
       <div class="sub">汽车用品 / 便利百货 / 香烟零售 / 烟草批发 / 咖啡</div><div id="c5" class="chart"></div></div>
     <div class="card"><h3 id="t6">双口径对比（金额 / 毛利，万元）</h3>
       <div class="sub">含烟草 vs 不含烟草</div><div id="c6" class="chart"></div></div>
+    <div class="card"><h3 id="t11">各站车流量与单加升数</h3>
+      <div class="sub">柱=总车次 · 线=平均单加升数(升/单) · 深色=当前选中站</div><div id="c11" class="chart"></div></div>
+    <div class="card"><h3 id="t12">各站非油转化率</h3>
+      <div class="sub">% · 非油笔数 ÷ 总车次 · 虚线=公司均值 · 深色=当前选中站</div><div id="c12" class="chart"></div></div>
   </div>
   <div class="stack">
     <div class="card wide"><h3 id="t3">各站分会计月销售趋势（含烟草金额）</h3>
@@ -687,6 +697,72 @@ function renderKPI(){
   ];
   document.getElementById('kpis').innerHTML = cards.map(c=>
     `<div class="kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
+}
+
+// ---------- 车流与转化（单数统计） ----------
+function _cnt(){ return (DATA.counts) || { totals:null, stations:[], monthly:{}, daily30:{dates:[],tot:[],nb:[]} }; }
+function _stripInt(v){ return (v==null||v==='') ? '—' : Number(v).toLocaleString('zh-CN'); }
+function renderTrafficKPI(){
+  const cd = _cnt();
+  const st = (SEL === '全公司') ? null : (cd.stations||[]).find(x => x.name === SEL);
+  const t = st || cd.totals || {};
+  const pre = st ? (SEL + ' ') : '';
+  const cards = [
+    {k: pre + '总服务车次', v: _stripInt(t.tot), u:'车次',
+     s: '汽油 ' + _stripInt(t.gas) + ' · 柴油 ' + _stripInt(t.die)},
+    {k: pre + '总加油升数', v: (t.vol ? (t.vol/1e4).toFixed(1) : '—'), u:'万升',
+     s: '汽油 ' + (t.gasL ? (t.gasL/1e4).toFixed(1) : '—') + '万 · 柴油 ' + (t.dieL ? (t.dieL/1e4).toFixed(1) : '—') + '万'},
+    {k: pre + '汽油单加升数', v: (t.gasPer==null?'—':t.gasPer), u:'升/单',
+     s: '汽油升数 ÷ 汽油车次'},
+    {k: pre + '柴油单加升数', v: (t.diePer==null?'—':t.diePer), u:'升/单',
+     s: '柴油升数 ÷ 柴油车次'},
+  ];
+  document.getElementById('tkpis').innerHTML = cards.map(c =>
+    `<div class="kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
+}
+function renderTraffic(){
+  const cd = _cnt(); if(!(cd.stations||[]).length) return;
+  const arr = cd.stations.slice().sort((a,b)=>a.tot-b.tot);
+  const names = arr.map(x=>x.name), tots = arr.map(x=>x.tot), pers = arr.map(x=>x.volPer);
+  const colorOf = x => (SEL!=='全公司' && x===SEL) ? '#fbbf24' : C.data;
+  mk('c11', {
+    tooltip: Object.assign({}, baseTip, {formatter: ps => {
+      const p = ps[0];
+      let h = '<b>' + p.name + '</b><br>';
+      ps.forEach(x=>{ h += x.marker + x.seriesName + '：' + fmt2(x.value) + (x.seriesName.indexOf('单加')>=0?' 升/单':' 车次') + '<br>'; });
+      return h;
+    }}),
+    legend:{data:['总车次','平均单加升数'], textStyle:{color:C.txt,fontSize:12,fontWeight:600}, top:2},
+    grid:{left:70, right:56, top:36, bottom:26},
+    xAxis:[ Object.assign(val('车次'),{}), Object.assign(val('升/单'),{position:'top',splitLine:{show:false}}) ],
+    yAxis: Object.assign(cat(names), {axisLabel:{color:C.txt, fontSize:11.5}}),
+    series:[
+      {name:'总车次', type:'bar', data:tots.map(v=>({value:v, itemStyle:{color:colorOf, borderRadius:[0,4,4,0]}})), barWidth:14},
+      {name:'平均单加升数', type:'line', xAxisIndex:1, data:pers, symbol:'circle', symbolSize:6,
+       lineStyle:{width:2, color:'#34d399'}, itemStyle:{color:'#34d399'}},
+    ]
+  });
+}
+function renderConv(){
+  const cd = _cnt(); if(!(cd.stations||[]).length) return;
+  const avg = (cd.totals && cd.totals.conv) || 0;
+  const arr = cd.stations.slice().sort((a,b)=>a.conv-b.conv);
+  const names = arr.map(x=>x.name), convs = arr.map(x=>x.conv);
+  mk('c12', {
+    tooltip: Object.assign({}, baseTip, {valueFormatter:v=>num2(v)+'%'}),
+    grid:{left:70, right:44, top:20, bottom:26},
+    xAxis: Object.assign(val('转化率', v=>v+'%'), {max: Math.max(60, Math.max.apply(null, convs)*1.1)}),
+    yAxis: Object.assign(cat(names), {axisLabel:{color:C.txt, fontSize:11.5}}),
+    series:[{
+      type:'bar', data: convs.map((x,i)=>({value:x, itemStyle:{
+        color: (SEL!=='全公司' && arr[i].name===SEL) ? '#fbbf24'
+               : (x>=30 ? '#34d399' : (x<15 ? '#ef4444' : '#3b82f6')),
+        borderRadius:[0,4,4,0]}})), barWidth:14,
+      label:{show:true, position:'right', color:C.txt, fontSize:10.5, formatter:p=>num2(p.value)+'%'},
+      markLine:{symbol:'none', silent:true, data:[{xAxis:avg, lineStyle:{color:'#fbbf24', type:'dashed', width:1.5},
+        label:{formatter:'公司均值 '+num2(avg)+'%', color:'#fbbf24', fontSize:10, position:'end'}}]}
+    }]
+  });
 }
 
 // ---------- 图1 任务（公司=排行；选中站=该站任务进度） ----------
@@ -1069,7 +1145,8 @@ function renderDetail(){
 // ---------- 渲染总入口 ----------
 function renderAll(){
   charts.forEach(c=>c.dispose()); charts.length=0;
-  renderKPI(); renderRank(); renderRate(); renderRank2(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
+  renderKPI(); renderTrafficKPI(); renderRank(); renderRate(); renderRank2(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
+  renderTraffic(); renderConv();
   renderDetail();
   document.getElementById('upd').textContent = '数据生成于 ' + DATA.generatedAt
     + ' · ' + YEAR + ' 会计年（' + (YEAR==='2027' ? '2026-12-26 ~ 2027-12-25' : '2025-12-26 ~ 2026-12-25') + '）'
