@@ -550,8 +550,8 @@ if (typeof echarts === 'undefined') {
     <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
     <p class="byline">Design by 刘龙伟 · Email: liulongwei@126.com</p>
     <div class="yearbar" id="yearbar">
-      <div class="ytab active" data-year="2027" title="2027会计年: 2026-12-26 ~ 2027-12-25">2027 · 本年</div>
-      <div class="ytab" data-year="2026" title="2026会计年: 2025-12-26 ~ 2026-12-25 (已归档)">2026 · 上年</div>
+      <div class="ytab active" data-year="2027" title="2027会计年: 2026-12-26 ~ 2027-12-25（预留，12-26 启用）">2027.预留</div>
+      <div class="ytab" data-year="2026" title="2026会计年: 2025-12-26 ~ 2026-12-25">2026年</div>
     </div>
     <div class="upd" id="upd"></div>
   </header>
