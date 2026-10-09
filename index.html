@@ -136,9 +136,9 @@ if (typeof echarts === 'undefined') {
     <div class="card"><h3 id="t2">各站任务完成率（含烟草）</h3>
       <div class="sub">累计完成 ÷ 年任务 · 深色=当前选中站</div><div id="c2" class="chart"></div></div>
     <div class="card"><h3 id="t9">毛利贡献额排名（含烟草 · 年度累计）</h3>
-      <div class="sub">万元 · 各站累计毛利降序</div><div id="c9" class="chart"></div></div>
+      <div class="sub">万元 · 各站累计毛利降序 · 金色描边=当前选中站</div><div id="c9" class="chart"></div></div>
     <div class="card"><h3 id="t10">毛利率排名（含烟草 · 年度累计）</h3>
-      <div class="sub">% · 各站累计毛利率降序 · 红线=23.5% 公司红线</div><div id="c10" class="chart"></div></div>
+      <div class="sub">% · 各站累计毛利率降序 · 红线=23.5% · 金色描边=当前选中站</div><div id="c10" class="chart"></div></div>
     <div class="card"><h3 id="t5">金额构成（含烟草 · 年度累计，万元）</h3>
       <div class="sub">汽车用品 / 便利百货 / 香烟零售 / 烟草批发 / 咖啡</div><div id="c5" class="chart"></div></div>
     <div class="card"><h3 id="t6">双口径对比（金额 / 毛利，万元）</h3>
@@ -148,7 +148,7 @@ if (typeof echarts === 'undefined') {
     <div class="card"><h3 id="t12">各站单加升数</h3>
       <div class="sub">升/单 · 汽油 vs 柴油 · 金色描边=当前选中站</div><div id="c12" class="chart"></div></div>
     <div class="card"><h3 id="t13">各站非油转化率</h3>
-      <div class="sub">% · 非油笔数 ÷ 总车次 · 虚线=公司均值</div><div id="c13" class="chart"></div></div>
+      <div class="sub">% · 非油笔数 ÷ 总车次 · 虚线=公司均值 · 金色描边=当前选中站</div><div id="c13" class="chart"></div></div>
   </div>
   <div class="stack">
     <div class="card wide"><h3 id="t3">各站分会计月销售趋势（含烟草金额）</h3>
@@ -353,8 +353,9 @@ function renderConv(){
     series:[{
       type:'bar', barWidth:13,
       data: convs.map((x,i)=>({value:x, itemStyle:{
-        color: (SEL!=='全公司' && names[i]===SEL) ? '#fbbf24'
-               : (x>=30 ? '#34d399' : (x<15 ? '#ef4444' : '#3b82f6')),
+        color: (x>=30 ? '#34d399' : (x<15 ? '#ef4444' : '#3b82f6')),
+        borderColor: (SEL!=='全公司' && names[i]===SEL) ? '#fbbf24' : 'transparent',
+        borderWidth: (SEL!=='全公司' && names[i]===SEL) ? 2 : 0,
         borderRadius:[0,3,3,0]}})),
       label:{show:true, position:'right', color:C.txt, fontSize:10, formatter:p=>num2(p.value)+'%'},
       markLine:{symbol:'none', silent:true, data:[{xAxis:avg, lineStyle:{color:'#fbbf24', type:'dashed', width:1.5},
@@ -636,6 +637,8 @@ function renderRank2(){
       axisLine:{show:false},axisTick:{show:false},axisLabel:{color:C.txt,fontSize:11.5}},
     series:[{type:'bar',data:byProfit.map((x,i)=>({
         value:x.profit, itemStyle:{color:i===0?'#fbbf24':(i===1?'#60a5fa':'#3b82f6'),
+          borderColor:(SEL!=='全公司'&&x.name===SEL)?'#fbbf24':'transparent',
+          borderWidth:(SEL!=='全公司'&&x.name===SEL)?2:0,
           borderRadius:[0,4,4,0]}})),
       barWidth:16,
       label:{show:true,position:'right',color:C.txt,fontSize:10.5,formatter:p=>num2(p.value)+'万'}}]});
@@ -650,7 +653,10 @@ function renderRank2(){
       axisLine:{show:false},axisTick:{show:false},axisLabel:{color:C.txt,fontSize:11.5}},
     series:[{type:'bar',data:byRate.map((x,i)=>({
         value:x.rate,
-        itemStyle:{color: x.rate>=23.5 ? '#34d399' : '#ef4444', borderRadius:[0,4,4,0]}})),
+        itemStyle:{color: x.rate>=23.5 ? '#34d399' : '#ef4444',
+          borderColor:(SEL!=='全公司'&&x.name===SEL)?'#fbbf24':'transparent',
+          borderWidth:(SEL!=='全公司'&&x.name===SEL)?2:0,
+          borderRadius:[0,4,4,0]}})),
       barWidth:16,
       label:{show:true,position:'right',color:C.txt,fontSize:10.5,formatter:p=>num2(p.value)+'%'},
       markLine:{symbol:'none',data:[{xAxis:23.5,lineStyle:{color:'#fbbf24',type:'dashed',width:1.5},
