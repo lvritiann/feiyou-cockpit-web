@@ -35,6 +35,11 @@ if (typeof echarts === 'undefined') {
     color:var(--mut);font-size:13px;font-weight:600;cursor:pointer;transition:.18s;user-select:none}
   .ytab:hover{color:var(--data);border-color:var(--data2)}
   .ytab.active{background:var(--hero);color:#fff;border-color:var(--hero)}
+  /* 出站跳转（非油销售预测）：与年份切页同形，但用金色描边区分「会离开本页」 */
+  .ytab.go{color:var(--accent);border-color:rgba(251,191,36,.42);
+    background:linear-gradient(135deg,rgba(251,191,36,.12),rgba(59,130,246,.10));
+    text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+  .ytab.go:hover{color:#fff;border-color:var(--accent);background:rgba(251,191,36,.2)}
 
   /* 联动站点选择器 */
   .stations{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 18px}
@@ -109,6 +114,11 @@ if (typeof echarts === 'undefined') {
     <div class="yearbar" id="yearbar">
       <div class="ytab active" data-year="2027" title="2027会计年: 2026-12-26 ~ 2027-12-25（预留，12-26 启用）">2027.预留</div>
       <div class="ytab" data-year="2026" title="2026会计年: 2025-12-26 ~ 2026-12-25">2026年</div>
+    </div>
+    <!-- 非油销售预测已并入本驾驶舱：导航站不再单列入口，统一从这里进入 -->
+    <div class="yearbar">
+      <a class="ytab go" href="https://nonoil-forecast-42019.app.workbuddy.host/"
+         target="_blank" rel="noopener" title="非油销量预测与任务申报系统（原导航站独立入口，现并入本驾驶舱）">非油销售预测 ↗</a>
     </div>
     <div class="upd" id="upd"></div>
   </header>
