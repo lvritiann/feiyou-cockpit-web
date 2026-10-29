@@ -474,18 +474,24 @@ if (typeof echarts === 'undefined') {
 
   /* 年度切换器 */
   .yearbar{display:flex;gap:8px;margin-top:10px}
-  /* 页面左上角的出站入口：单列一行，与年份切页彻底分开 */
-  .navtop{display:flex;align-items:center;margin:0 0 12px}
-  .navtop .ytab.go{font-size:12px;padding:6px 14px}
+  /* 标题行：左标题块 + 右上角文字链接 */
+  .hdrow{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+  .hdmain{min-width:0}
+  .navlink{flex:none;font-size:12px;line-height:1.5;color:var(--mut);text-decoration:none;
+    border-bottom:1px dashed rgba(143,161,197,.42);padding-bottom:1px;white-space:nowrap;
+    margin-top:2px;transition:color .18s,border-color .18s}
+  .navlink .ar{opacity:.65;margin-left:4px;font-size:11px}
+  .navlink:hover{color:var(--data2);border-bottom-color:var(--data2)}
+  .navlink:hover .ar{opacity:1}
+  @media (max-width:760px){
+    .hdrow{flex-wrap:wrap;gap:8px}
+    .hdmain{flex:1 0 100%}
+    .navlink{margin-left:auto;margin-top:0}
+  }
   .ytab{padding:7px 18px;border-radius:999px;border:1px solid var(--line);background:var(--card);
     color:var(--mut);font-size:13px;font-weight:600;cursor:pointer;transition:.18s;user-select:none}
   .ytab:hover{color:var(--data);border-color:var(--data2)}
   .ytab.active{background:var(--hero);color:#fff;border-color:var(--hero)}
-  /* 出站跳转（非油销售预测）：与年份切页同形，但用金色描边区分「会离开本页」 */
-  .ytab.go{color:var(--accent);border-color:rgba(251,191,36,.42);
-    background:linear-gradient(135deg,rgba(251,191,36,.12),rgba(59,130,246,.10));
-    text-decoration:none;display:inline-flex;align-items:center;gap:5px}
-  .ytab.go:hover{color:#fff;border-color:var(--accent);background:rgba(251,191,36,.2)}
 
   /* 联动站点选择器 */
   .stations{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 18px}
@@ -554,16 +560,19 @@ if (typeof echarts === 'undefined') {
 <body>
 <div class="wrap">
   <header>
-    <!-- 非油销售预测已并入本驾驶舱：导航站不再单列入口，统一从页面左上角进入。
-         刻意与下方「2027/2026」年份切页拉开距离（独立一行、左对齐、字号更小），
-         避免两种语义完全不同的控件并排造成误读。 -->
-    <div class="navtop">
-      <a class="ytab go" href="https://nonoil-forecast-42019.app.workbuddy.host/"
-         target="_blank" rel="noopener" title="非油销量预测与任务申报系统（原导航站独立入口，现并入本驾驶舱）">非油销售预测 ↗</a>
+    <div class="hdrow">
+      <div class="hdmain">
+        <h1>陕西高速延长石油有限责任公司非油销售汇总驾驶舱 · 图表视图</h1>
+        <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
+        <p class="byline">Design by 刘龙伟 · Email: liulongwei@126.com</p>
+      </div>
+      <!-- 非油销售预测已并入本驾驶舱：导航站不再单列入口，统一从右上角文字链接进入。
+           刻意不用胶囊按钮 —— 它和下方的年份切页同为圆角块状，放一起会被读成「第三个年份」。
+           改为纯文字 + 虚线底边：弱化体量，但仍保留箭头与 hover 反馈，保证可发现。 -->
+      <a class="navlink" href="https://nonoil-forecast-42019.app.workbuddy.host/"
+         target="_blank" rel="noopener"
+         title="非油销量预测与任务申报系统（原导航站独立入口，现并入本驾驶舱）">非油销售预测<span class="ar">↗</span></a>
     </div>
-    <h1>陕西高速延长石油有限责任公司非油销售汇总驾驶舱 · 图表视图</h1>
-    <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
-    <p class="byline">Design by 刘龙伟 · Email: liulongwei@126.com</p>
     <div class="yearbar" id="yearbar">
       <div class="ytab active" data-year="2027" title="2027会计年: 2026-12-26 ~ 2027-12-25（预留，12-26 启用）">2027.预留</div>
       <div class="ytab" data-year="2026" title="2026会计年: 2025-12-26 ~ 2026-12-25">2026年</div>
