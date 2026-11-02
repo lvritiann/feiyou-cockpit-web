@@ -474,20 +474,6 @@ if (typeof echarts === 'undefined') {
 
   /* 年度切换器 */
   .yearbar{display:flex;gap:8px;margin-top:10px}
-  /* 标题行：左标题块 + 右上角文字链接 */
-  .hdrow{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
-  .hdmain{min-width:0}
-  .navlink{flex:none;font-size:12px;line-height:1.5;color:var(--mut);text-decoration:none;
-    border-bottom:1px dashed rgba(143,161,197,.42);padding-bottom:1px;white-space:nowrap;
-    margin-top:2px;transition:color .18s,border-color .18s}
-  .navlink .ar{opacity:.65;margin-left:4px;font-size:11px}
-  .navlink:hover{color:var(--data2);border-bottom-color:var(--data2)}
-  .navlink:hover .ar{opacity:1}
-  @media (max-width:760px){
-    .hdrow{flex-wrap:wrap;gap:8px}
-    .hdmain{flex:1 0 100%}
-    .navlink{margin-left:auto;margin-top:0}
-  }
   .ytab{padding:7px 18px;border-radius:999px;border:1px solid var(--line);background:var(--card);
     color:var(--mut);font-size:13px;font-weight:600;cursor:pointer;transition:.18s;user-select:none}
   .ytab:hover{color:var(--data);border-color:var(--data2)}
@@ -555,24 +541,88 @@ if (typeof echarts === 'undefined') {
   .sms-card .sms{font-size:12.8px;color:var(--txt);line-height:1.9;white-space:pre-wrap}
   .sms-card .sms b{color:var(--accent);font-weight:700}
   .note{font-size:11px;color:var(--faint);margin-top:8px;line-height:1.7}
+
+  /* ══════════ 销售概览（前一日 · 仅在总览页） ══════════ */
+  .so{margin:2px 0 20px}
+  .so-strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;padding:11px 16px;font-size:12.5px;color:var(--mut)}
+  .so-strip b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+  .so-strip .sep{width:1px;height:13px;background:var(--line);flex:none}
+  .so-strip .tagname{color:var(--accent);font-weight:700}
+  .so-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+  .so-kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px 16px}
+  .so-kpi .k{font-size:11.5px;color:var(--mut)}
+  .so-kpi .v{font-size:23px;font-weight:800;color:var(--ink);margin-top:4px;letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums}
+  .so-kpi .v small{font-size:12px;color:var(--mut);font-weight:600;margin-left:3px}
+  .so-kpi .s{font-size:11px;color:var(--faint);margin-top:3px}
+  .so-body{display:grid;grid-template-columns:290px 1fr;gap:12px;margin-top:12px}
+  .so-donutbox{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:10px 12px 6px;position:relative}
+  .so-chart{width:100%;height:186px}
+  .so-donut-center{position:absolute;left:0;right:0;top:92px;text-align:center;pointer-events:none}
+  .so-donut-center b{display:block;font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+  .so-donut-center em{display:block;font-style:normal;font-size:10.5px;color:var(--faint);margin-top:1px}
+  .so-catlist{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 18px;
+    display:flex;flex-direction:column;justify-content:center}
+  .so-catlist .cap{font-size:11px;color:var(--faint);padding-bottom:7px;border-bottom:1px solid var(--line)}
+  .so-catlist #soCatList{display:grid;grid-template-rows:repeat(3,auto);grid-auto-flow:column;
+    column-gap:34px;align-content:center;flex:1;padding-top:5px}
+  .so-crow{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12.5px;
+    border-bottom:1px solid rgba(35,47,74,.5)}
+  .so-crow:nth-child(3),.so-crow:last-child{border-bottom:none}
+  .so-crow i{width:9px;height:9px;border-radius:3px;flex:none}
+  .so-crow span{color:var(--txt);flex:1;white-space:nowrap}
+  .so-crow em{font-style:normal;color:var(--faint);font-size:11px;width:46px;text-align:right}
+  .so-crow b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;width:88px;text-align:right}
+  .so-crow.tot b{color:var(--accent)}
+  .so-stations{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:12px;margin-top:14px}
+  .so-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px 13px;
+    cursor:pointer;transition:.16s}
+  .so-card:hover{border-color:var(--data2);transform:translateY(-1px)}
+  .so-card.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .so-c-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .so-c-name{font-size:14px;font-weight:700;color:var(--ink)}
+  .so-c-share{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .so-c-body{display:flex;gap:10px;align-items:center}
+  .so-c-donut{width:84px;height:84px;flex:none}
+  .so-c-list{flex:1;min-width:0}
+  .so-li{display:flex;align-items:center;gap:6px;font-size:11.5px;line-height:1.8}
+  .so-li i{width:7px;height:7px;border-radius:2px;flex:none}
+  .so-li span{color:var(--mut);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .so-li b{color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums}
+  .so-li.tot{padding-top:3px;border-top:1px solid var(--line);margin-top:2px}
+  .so-li.tot b{color:var(--accent);font-weight:700}
+  .so-c-foot{display:flex;justify-content:space-between;gap:6px;margin-top:8px;padding-top:7px;
+    border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+  .so-c-foot b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+  .so-bad{color:#fca5a5;font-weight:700}
+  .so-na{color:#64748b;font-weight:600}
+  .so-empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:14px 16px;
+    font-size:12.5px;color:var(--faint);text-align:center}
+  @media(max-width:1180px){.so-body{grid-template-columns:1fr}.so-donut-center{top:92px}}
+  @media(max-width:980px){.so-kpis{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:760px){
+    .so-stations{grid-template-columns:1fr}
+    .so-strip{font-size:12px}
+    /* 窄屏：品类改单列，否则双列最小内容宽度会把整页撑出横向滚动 */
+    .so-catlist #soCatList{grid-template-columns:1fr;grid-template-rows:none;grid-auto-flow:row;
+      column-gap:0}
+    .so-crow{padding:5px 0}
+    .so-crow:nth-child(3){border-bottom:1px solid rgba(35,47,74,.5)}
+    .so-crow em{width:42px}
+    .so-crow b{width:82px}
+    .so-c-body{gap:8px}
+    .so-c-donut{width:72px;height:72px}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="hdrow">
-      <div class="hdmain">
-        <h1>陕西高速延长石油有限责任公司非油销售汇总驾驶舱 · 图表视图</h1>
-        <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
-        <p class="byline">Design by 刘龙伟 · Email: liulongwei@126.com</p>
-      </div>
-      <!-- 非油销售预测已并入本驾驶舱：导航站不再单列入口，统一从右上角文字链接进入。
-           刻意不用胶囊按钮 —— 它和下方的年份切页同为圆角块状，放一起会被读成「第三个年份」。
-           改为纯文字 + 虚线底边：弱化体量，但仍保留箭头与 hover 反馈，保证可发现。 -->
-      <a class="navlink" href="https://nonoil-forecast-42019.app.workbuddy.host/"
-         target="_blank" rel="noopener"
-         title="非油销量预测与任务申报系统（原导航站独立入口，现并入本驾驶舱）">非油销售预测<span class="ar">↗</span></a>
-    </div>
+    <h1>陕西高速延长石油有限责任公司非油销售汇总驾驶舱 · 图表视图</h1>
+    <p>联动仪表盘 · 点击站点可查看该站品类明细（数据取自驾驶舱按月汇总/图表数据源）</p>
+    <p class="byline">Design by 刘龙伟 · Email: liulongwei@126.com</p>
     <div class="yearbar" id="yearbar">
       <div class="ytab active" data-year="2027" title="2027会计年: 2026-12-26 ~ 2027-12-25（预留，12-26 启用）">2027.预留</div>
       <div class="ytab" data-year="2026" title="2026会计年: 2025-12-26 ~ 2026-12-25">2026年</div>
@@ -587,6 +637,24 @@ if (typeof echarts === 'undefined') {
 
   <!-- ═══ 总览视图 ═══ -->
   <div class="view active" id="view-overview">
+
+  <!-- ── 销售概览（前一日 · 仅总览页展示） ── -->
+  <section class="so" id="so">
+    <div class="so-strip" id="soStrip"></div>
+    <div class="so-kpis" id="soKpis"></div>
+    <div class="so-body">
+      <div class="so-donutbox">
+        <div id="soDonut" class="so-chart"></div>
+        <div class="so-donut-center"><b id="soDonutV">—</b><em>万元 · 总销售</em></div>
+      </div>
+      <div class="so-catlist">
+        <div class="cap">品类构成 · 金额（元） / 占比</div>
+        <div id="soCatList"></div>
+      </div>
+    </div>
+    <div class="so-stations" id="soStations"></div>
+  </section>
+
   <div class="stations" id="stations"></div>
 
   <div class="kpis" id="kpis"></div>
@@ -1211,9 +1279,139 @@ function renderDetail(){
     `<tr class="tot"><td>合计</td><td class="r">${fmt2(ta)}</td><td class="r">100%</td><td class="r">${fmt2(tp)}</td><td class="r">100%</td></tr>`;
 }
 
+// ---------- 销售概览（前一日 · 公司汇总 + 15 站分列） ----------
+// 数据源：data.json.salesOverview（由 AirScript v3.7 buildSalesOverview 生成）
+// 口径：总额=5品类之和；车流=汽油单+柴油单；笔数=汽用+便+咖；单笔=非烟金额÷笔数；
+//       转化率=笔数÷车流。含烟草口径单笔另列参考。
+const SO_COLORS = ['#3b82f6','#34d399','#fbbf24','#f97316','#a78bfa'];
+const soFmtY = v => (v==null||isNaN(v)) ? '—' : Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const soFmtN = v => (v==null||isNaN(v)) ? '—' : Number(v).toLocaleString('zh-CN');
+
+function renderSalesOverview(){
+  const sec = document.getElementById('so');
+  if(!sec) return;
+  const so = DATA && DATA.salesOverview;
+  if(!so || !so.company){
+    sec.style.display = 'none';
+    return;
+  }
+  sec.style.display = '';
+
+  const cats = (so.cats && so.cats.length) ? so.cats : (CAT_DETAIL.length ? CAT_DETAIL : ['汽车用品','便利百货','烟草零售','烟草批发','咖啡']);
+  const co = so.company;
+  const total = Number(co.amt) || 0;
+  const catAmt = co.catAmt || [];
+  const liveN = (so.stations||[]).filter(s => (s.amt>0 || s.carTot>0)).length;
+
+  // ── 顶部条 ──
+  const shares = cats.map((n,i)=> total ? ((catAmt[i]||0)/total*100).toFixed(1)+'%' : '—').join(' : ');
+  document.getElementById('soStrip').innerHTML =
+    `<span class="tagname">${so.isYesterday ? '前一日' : '最近有数日'} ${String(so.asOf||'').slice(5)}</span>
+     <span class="sep"></span>
+     <span>${liveN} 站在营合计 <b>${soFmtY(total)}</b> 元</span>
+     <span class="sep"></span>
+     <span>车流 <b>${soFmtN(co.carTot)}</b> 车次 · 非油 <b>${soFmtN(co.nb)}</b> 笔</span>
+     <span class="sep"></span>
+     <span>品类占比 ${shares}</span>
+     <span class="sep"></span>
+     <span>点击站卡可联动全页</span>`;
+
+  // ── 四个 KPI ──
+  const kp = [
+    {k:'总销售金额', v:soFmtY(co.amt), u:'元', s:'含烟草 · 五品类合计'},
+    {k:'总车流量', v:soFmtN(co.carTot), u:'车次', s:`汽油 ${soFmtN(co.gasCnt)} · 柴油 ${soFmtN(co.dieCnt)}`},
+    {k:'平均单笔消费', v:soFmtY(co.price), u:'元', s:`非烟口径 · 含烟草 ${soFmtY(co.priceTob)} 元`},
+    {k:'车次→非油转化率', v:(co.conv==null?'—':Number(co.conv).toFixed(2)), u:'%',
+     s:`非油笔数 ${soFmtN(co.nb)} ÷ 车次 ${soFmtN(co.carTot)}`},
+  ];
+  document.getElementById('soKpis').innerHTML = kp.map(c=>
+    `<div class="so-kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
+
+  // ── 品类明细（与环形图同色） ──
+  document.getElementById('soCatList').innerHTML =
+    cats.map((n,i)=>{
+      const v = Number(catAmt[i])||0;
+      return `<div class="so-crow"><i style="background:${SO_COLORS[i]||'#64748b'}"></i><span>${n}</span>`
+           + `<em>${total ? (v/total*100).toFixed(1) : '0.0'}%</em><b>${soFmtY(v)}</b></div>`;
+    }).join('')
+    + `<div class="so-crow tot"><i style="background:var(--accent)"></i><span>合计</span><em>100.0%</em><b>${soFmtY(total)}</b></div>`;
+
+  document.getElementById('soDonutV').textContent = (total/1e4).toFixed(2);
+
+  // ── 公司品类环形图 ──
+  mk('soDonut', {
+    tooltip: {...tipItem, formatter: p => `${p.name}<br/><b>${soFmtY(p.value)}</b> 元 · ${p.percent}%`},
+    series: [{
+      type:'pie', radius:['60%','90%'], center:['50%','50%'], avoidLabelOverlap:true,
+      itemStyle:{borderColor:'#162032', borderWidth:2},
+      label:{show:false}, labelLine:{show:false}, emphasis:{scale:true, scaleSize:4},
+      data: cats.map((n,i)=>({name:n, value:Number(catAmt[i])||0,
+        itemStyle:{color:SO_COLORS[i]||'#64748b'}}))
+    }]
+  });
+
+  // ── 15 站卡片 ──
+  const box = document.getElementById('soStations');
+  const list = so.stations || [];
+  box.innerHTML = list.map((s,idx)=>{
+    const amt = Number(s.amt)||0;
+    const share = total ? (amt/total*100) : 0;
+    const rows = cats.map((n,i)=>{
+      const v = Number((s.catAmt||[])[i])||0;
+      return `<div class="so-li"><i style="background:${SO_COLORS[i]||'#64748b'}"></i><span>${n}</span><b>${soFmtY(v)}</b></div>`;
+    }).join('');
+    const warn = s.warn ? '<span class="so-bad" title="单加升数越界，疑似「单数/升数」列错位"> ⚠</span>' : '';
+    const alive = (amt > 0 || Number(s.carTot) > 0);
+    return `<div class="so-card${SEL===s.name?' on':''}" data-so-station="${s.name}">
+      <div class="so-c-top"><span class="so-c-name">${s.name}</span>
+        <span class="so-c-share">${alive ? ('占比 ' + share.toFixed(1) + '%') : '<span class="so-na">无数据</span>'}</span></div>
+      <div class="so-c-body">
+        <div class="so-c-donut" id="soD${idx}"></div>
+        <div class="so-c-list">${rows}
+          <div class="so-li tot"><i style="background:var(--accent)"></i><span>合计</span><b>${soFmtY(amt)}</b></div>
+        </div>
+      </div>
+      <div class="so-c-foot">
+        <span>车流 <b>${soFmtN(s.carTot)}</b> 车次${warn}</span>
+        <span>转化 <b>${(s.conv==null?'—':Number(s.conv).toFixed(2))}%</b></span>
+        <span>单笔 <b>${soFmtY(s.price)}</b> 元</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 站卡小环形图
+  list.forEach((s,idx)=>{
+    const el = document.getElementById('soD'+idx);
+    if(!el) return;
+    const ca = s.catAmt || [];
+    const sTot = Number(s.amt)||0;
+    mk('soD'+idx, {
+      tooltip: {...tipItem, formatter: p => `${p.name}<br/><b>${soFmtY(p.value)}</b> 元 · ${p.percent}%`},
+      series: [{
+        type:'pie', radius:['62%','94%'], center:['50%','50%'],
+        itemStyle:{borderColor:'#162032', borderWidth:1.5},
+        label:{show:false}, labelLine:{show:false}, emphasis:{scale:true, scaleSize:3},
+        data: sTot > 0
+          ? cats.map((n,i)=>({name:n, value:Number(ca[i])||0, itemStyle:{color:SO_COLORS[i]||'#64748b'}}))
+          : [{name:'无销售', value:1, itemStyle:{color:'#243049'}}]
+      }]
+    });
+  });
+
+  // 点站卡 → 联动选中（改数据后走统一刷新入口，禁止渲染函数互调）
+  box.querySelectorAll('[data-so-station]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const n = el.getAttribute('data-so-station');
+      SEL = (SEL === n) ? '全公司' : n;
+      syncChips(); renderAll();
+    });
+  });
+}
+
 // ---------- 渲染总入口 ----------
 function renderAll(){
   charts.forEach(c=>c.dispose()); charts.length=0;
+  renderSalesOverview();
   renderKPI(); renderTrafficKPI(); renderRank(); renderRate(); renderRank2(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
   renderTraffic(); renderFuelPer(); renderConv();
   renderDetail();
