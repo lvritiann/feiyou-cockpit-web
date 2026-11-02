@@ -1279,12 +1279,16 @@ function renderDetail(){
   const pctA = c => (annA[c]/totA*100);
   const pctP = c => (annP[c]/totP*100);
 
-  // 金额堆叠：图例标全年占比%，tooltip 补当月占比%
+  // 金额堆叠：图例标全年占比%，tooltip 补当月占比% + 当月合计
+  const totName = isCo ? '公司合计' : '本站合计';
   mk('dAmt',{tooltip:{...baseTip, formatter:ps=>{
       const idx = ps[0].dataIndex;
-      const mTot = CAT_DETAIL.reduce((s,c)=>s+(amt[c][idx]||0),0) || 1;
+      const mSum = CAT_DETAIL.reduce((s,c)=>s+(amt[c][idx]||0),0);
+      const mTot = mSum || 1;
       let h = ps[0].name+'<br>';
       ps.forEach(x=>{ const v=x.value||0; h+=x.marker+x.seriesName+'：'+fmt2(v)+' 元（当月 '+(v/mTot*100).toFixed(1)+'%）'+'<br>'; });
+      h += '<div style="margin-top:5px;padding-top:5px;border-top:1px solid #e5e7eb;font-weight:700;color:#111827">'
+         + totName+'：'+fmt2(mSum)+' 元</div>';
       return h;
     }},
     legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6,
@@ -1293,12 +1297,15 @@ function renderDetail(){
     xAxis:cat(months), yAxis:val('元'),
     series:CAT_DETAIL.map((c,i)=>({name:c,type:'bar',stack:'a',data:amt[c],barMaxWidth:24,
       itemStyle:{color:MODAL_PALETTE[i]}}))});
-  // 毛利堆叠：图例标全年占比%，tooltip 补当月占比%
+  // 毛利堆叠：图例标全年占比%，tooltip 补当月占比% + 当月合计
   mk('dProf',{tooltip:{...baseTip, formatter:ps=>{
       const idx = ps[0].dataIndex;
-      const mTot = CAT_DETAIL.reduce((s,c)=>s+(prof[c][idx]||0),0) || 1;
+      const mSum = CAT_DETAIL.reduce((s,c)=>s+(prof[c][idx]||0),0);
+      const mTot = mSum || 1;
       let h = ps[0].name+'<br>';
       ps.forEach(x=>{ const v=x.value||0; h+=x.marker+x.seriesName+'：'+fmt2(v)+' 元（当月 '+(v/mTot*100).toFixed(1)+'%）'+'<br>'; });
+      h += '<div style="margin-top:5px;padding-top:5px;border-top:1px solid #e5e7eb;font-weight:700;color:#111827">'
+         + totName+'：'+fmt2(mSum)+' 元</div>';
       return h;
     }},
     legend:{textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}, top:6,
