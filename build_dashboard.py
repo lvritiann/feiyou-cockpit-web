@@ -1671,7 +1671,7 @@ document.querySelectorAll('#yearbar .ytab').forEach(t=>{
 });
 boot();
 </script>
-</body>
+<script src="hub-home.js" defer></script><!-- HUB-HOME v1 --></body>
 </html>
 """
 
