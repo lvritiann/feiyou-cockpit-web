@@ -695,7 +695,7 @@ if (typeof echarts === 'undefined') {
     <div class="so-body">
       <div class="so-donutbox">
         <div id="soDonut" class="so-chart"></div>
-        <div class="so-donut-center"><b id="soDonutV">—</b><em>万元 · 总销售</em></div>
+        <div class="so-donut-center"><b id="soDonutV">—</b><em id="soDonutCap">万元 · 总销售</em></div>
       </div>
       <div class="so-catlist">
         <div class="cap">品类构成 · 金额（元） / 占比</div>
@@ -1341,13 +1341,21 @@ function renderSalesOverview(){
   sec.style.display = '';
 
   const cats = (so.cats && so.cats.length) ? so.cats : (CAT_DETAIL.length ? CAT_DETAIL : ['汽车用品','便利百货','烟草零售','烟草批发','咖啡']);
-  const co = so.company;
-  const total = Number(co.amt) || 0;
-  const catAmt = co.catAmt || [];
   const list = so.stations || [];
   const isOff = n => SO_INACTIVE.indexOf(n) >= 0;
   const offNames = list.filter(s => isOff(s.name)).map(s => s.name);
   const liveN = list.filter(s => !isOff(s.name) && (s.amt>0 || s.carTot>0)).length;
+
+  // ── 统计口径随选中站点切换 ──
+  //   SEL = 全公司 → 用 salesOverview.company（15 站汇总）
+  //   SEL = 某站   → 用 salesOverview.stations 里该站的前一日数据
+  const stSel = (SEL === '全公司') ? null : list.filter(s => s.name === SEL)[0];
+  const isCompany = !stSel;
+  const co = stSel || so.company;
+  const total = Number(co.amt) || 0;
+  const catAmt = co.catAmt || [];
+  const scopeName = stSel ? stSel.name : '';
+  const stOff = !!stSel && isOff(stSel.name);
 
   // ── 顶部条 ──
   // 品类部分直接列出「名称 + 金额 + 占比」，不单独放提示文案
@@ -1358,20 +1366,23 @@ function renderSalesOverview(){
          + `<b>${soFmtY(v)}</b>元<em>${p}%</em></span>`;
   }).join('');
   document.getElementById('soStrip').innerHTML =
-    `<span class="tagname">${so.isYesterday ? '前一日' : '最近有数日'} ${String(so.asOf||'').slice(5)}</span>
+    `<span class="tagname">${so.isYesterday ? '前一日' : '最近有数日'} ${String(so.asOf||'').slice(5)}${isCompany ? '' : ' · ' + scopeName}</span>
      <span class="sep"></span>
-     <span>${liveN} 站在营合计 <b>${soFmtY(total)}</b> 元${offNames.length ? `（${offNames.join('、')}不正常营业）` : ''}</span>
+     <span>${isCompany
+        ? `${liveN} 站在营合计 <b>${soFmtY(total)}</b> 元${offNames.length ? `（${offNames.join('、')}不正常营业）` : ''}`
+        : `本站合计 <b>${soFmtY(total)}</b> 元${stOff ? '（不正常营业）' : ''}`}</span>
      <span class="sep"></span>
      <span>车流 <b>${soFmtN(co.carTot)}</b> 车次 · 非油 <b>${soFmtN(co.nb)}</b> 笔</span>
      <span class="sep"></span>
      <span class="so-cats">${catPills}</span>`;
 
-  // ── 四个 KPI ──
+  // ── 四个 KPI（单站视图用「本站」前缀，避免与全公司口径混淆） ──
+  const P = isCompany ? '' : '本站';
   const kp = [
-    {k:'总销售金额', v:soFmtY(co.amt), u:'元', s:'含烟草 · 五品类合计'},
-    {k:'总车流量', v:soFmtN(co.carTot), u:'车次', s:`汽油 ${soFmtN(co.gasCnt)} · 柴油 ${soFmtN(co.dieCnt)}`},
-    {k:'平均单笔消费', v:soFmtY(co.price), u:'元', s:`非烟口径 · 含烟草 ${soFmtY(co.priceTob)} 元`},
-    {k:'车次→非油转化率', v:(co.conv==null?'—':Number(co.conv).toFixed(2)), u:'%',
+    {k:P+'总销售金额', v:soFmtY(co.amt), u:'元', s:'含烟草 · 五品类合计'},
+    {k:P+'总车流量', v:soFmtN(co.carTot), u:'车次', s:`汽油 ${soFmtN(co.gasCnt)} · 柴油 ${soFmtN(co.dieCnt)}`},
+    {k:P+'平均单笔消费', v:soFmtY(co.price), u:'元', s:`非烟口径 · 含烟草 ${soFmtY(co.priceTob)} 元`},
+    {k:P+'车次→非油转化率', v:(co.conv==null?'—':Number(co.conv).toFixed(2)), u:'%',
      s:`非油笔数 ${soFmtN(co.nb)} ÷ 车次 ${soFmtN(co.carTot)}`},
   ];
   document.getElementById('soKpis').innerHTML = kp.map(c=>
@@ -1387,6 +1398,8 @@ function renderSalesOverview(){
     + `<div class="so-crow tot"><i style="background:var(--accent)"></i><span>合计</span><em>100.0%</em><b>${soFmtY(total)}</b></div>`;
 
   document.getElementById('soDonutV').textContent = (total/1e4).toFixed(2);
+  const capEl = document.getElementById('soDonutCap');
+  if(capEl) capEl.textContent = '万元 · ' + (isCompany ? '总销售' : scopeName + '销售');
 
   // ── 公司品类环形图 ──
   mk('soDonut', {
