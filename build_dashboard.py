@@ -549,6 +549,13 @@ if (typeof echarts === 'undefined') {
   .so-strip b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
   .so-strip .sep{width:1px;height:13px;background:var(--line);flex:none}
   .so-strip .tagname{color:var(--accent);font-weight:700}
+  /* 品类明细小卡：名称 + 金额 + 占比 */
+  .so-cats{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .so-pill{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.035);
+    border:1px solid var(--line);border-radius:7px;padding:2px 9px;font-size:11.5px;color:var(--mut)}
+  .so-pill i{width:7px;height:7px;border-radius:2px;flex:none}
+  .so-pill b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+  .so-pill em{font-style:normal;color:var(--faint);font-size:11px;margin-left:1px}
   .so-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
   .so-kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px 16px}
   .so-kpi .k{font-size:11.5px;color:var(--mut)}
@@ -576,9 +583,11 @@ if (typeof echarts === 'undefined') {
   .so-crow em{font-style:normal;color:var(--faint);font-size:11px;width:46px;text-align:right}
   .so-crow b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;width:88px;text-align:right}
   .so-crow.tot b{color:var(--accent)}
-  .so-stations{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:12px;margin-top:14px}
+  /* 站卡：一排 5 个 × 3 排（15 站），等行高 + 底部信息对齐 */
+  .so-stations{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:1fr;
+    gap:12px;margin-top:14px}
   .so-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px 13px;
-    cursor:pointer;transition:.16s}
+    cursor:pointer;transition:.16s;display:flex;flex-direction:column;min-width:0}
   .so-card:hover{border-color:var(--data2);transform:translateY(-1px)}
   .so-card.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
   .so-c-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
@@ -593,17 +602,27 @@ if (typeof echarts === 'undefined') {
   .so-li b{color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums}
   .so-li.tot{padding-top:3px;border-top:1px solid var(--line);margin-top:2px}
   .so-li.tot b{color:var(--accent);font-weight:700}
-  .so-c-foot{display:flex;justify-content:space-between;gap:6px;margin-top:8px;padding-top:7px;
-    border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+  .so-c-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 6px;
+    margin-top:auto;padding-top:7px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--faint)}
+  .so-c-foot span{white-space:nowrap}
   .so-c-foot b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
   .so-bad{color:#fca5a5;font-weight:700}
   .so-na{color:#64748b;font-weight:600}
+  .so-off{display:inline-block;color:#fbbf24;background:rgba(251,191,36,.12);
+    border:1px solid rgba(251,191,36,.38);border-radius:5px;padding:1px 7px;font-size:10.5px;font-weight:700}
+  .so-card.off{border-color:rgba(251,191,36,.25)}
+  .so-card.off .so-c-name{color:#e8d9a8}
   .so-empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:14px 16px;
     font-size:12.5px;color:var(--faint);text-align:center}
   @media(max-width:1180px){.so-body{grid-template-columns:1fr}.so-donut-center{top:92px}}
   @media(max-width:980px){.so-kpis{grid-template-columns:repeat(2,1fr)}}
+  /* 站卡列数：默认 5（一排 5 个 × 3 排）；窄屏逐级降列，始终等宽等行高 */
+  @media(max-width:1300px){.so-stations{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  @media(max-width:1060px){.so-stations{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media(max-width:800px){.so-stations{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:520px){.so-stations{grid-template-columns:1fr}}
   @media(max-width:760px){
-    .so-stations{grid-template-columns:1fr}
     .so-strip{font-size:12px}
     /* 窄屏：品类改单列，否则双列最小内容宽度会把整页撑出横向滚动 */
     .so-catlist #soCatList{grid-template-columns:1fr;grid-template-rows:none;grid-auto-flow:row;
@@ -638,7 +657,17 @@ if (typeof echarts === 'undefined') {
   <!-- ═══ 总览视图 ═══ -->
   <div class="view active" id="view-overview">
 
-  <!-- ── 销售概览（前一日 · 仅总览页展示） ── -->
+  <div class="stations" id="stations"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin:2px 0 12px">
+    <span style="font-size:12.5px;font-weight:600;color:var(--mut)">车流与转化 · 单数统计</span>
+    <span style="flex:1;height:1px;background:var(--line)"></span>
+  </div>
+  <div class="kpis" id="tkpis"></div>
+
+  <!-- ── 销售概览（前一日 · 仅总览页；位置：车流与转化 KPI 之下） ── -->
   <section class="so" id="so">
     <div class="so-strip" id="soStrip"></div>
     <div class="so-kpis" id="soKpis"></div>
@@ -654,16 +683,6 @@ if (typeof echarts === 'undefined') {
     </div>
     <div class="so-stations" id="soStations"></div>
   </section>
-
-  <div class="stations" id="stations"></div>
-
-  <div class="kpis" id="kpis"></div>
-
-  <div style="display:flex;align-items:center;gap:10px;margin:2px 0 12px">
-    <span style="font-size:12.5px;font-weight:600;color:var(--mut)">车流与转化 · 单数统计</span>
-    <span style="flex:1;height:1px;background:var(--line)"></span>
-  </div>
-  <div class="kpis" id="tkpis"></div>
 
   <div class="grid">
     <div class="card"><h3 id="t1">各站任务完成排行 · 年任务 vs 累计完成（含烟草）</h3>
@@ -1284,6 +1303,9 @@ function renderDetail(){
 // 口径：总额=5品类之和；车流=汽油单+柴油单；笔数=汽用+便+咖；单笔=非烟金额÷笔数；
 //       转化率=笔数÷车流。含烟草口径单笔另列参考。
 const SO_COLORS = ['#3b82f6','#34d399','#fbbf24','#f97316','#a78bfa'];
+// 非正常营业站点（关停 / 停业 / 未复营）：站卡右上角标注「不正常营业」，并从「在营站数」中排除。
+// 站点复营后从此数组移除即可，无需改其它代码。
+const SO_INACTIVE = ['华山'];
 const soFmtY = v => (v==null||isNaN(v)) ? '—' : Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const soFmtN = v => (v==null||isNaN(v)) ? '—' : Number(v).toLocaleString('zh-CN');
 
@@ -1301,20 +1323,27 @@ function renderSalesOverview(){
   const co = so.company;
   const total = Number(co.amt) || 0;
   const catAmt = co.catAmt || [];
-  const liveN = (so.stations||[]).filter(s => (s.amt>0 || s.carTot>0)).length;
+  const list = so.stations || [];
+  const isOff = n => SO_INACTIVE.indexOf(n) >= 0;
+  const offNames = list.filter(s => isOff(s.name)).map(s => s.name);
+  const liveN = list.filter(s => !isOff(s.name) && (s.amt>0 || s.carTot>0)).length;
 
   // ── 顶部条 ──
-  const shares = cats.map((n,i)=> total ? ((catAmt[i]||0)/total*100).toFixed(1)+'%' : '—').join(' : ');
+  // 品类部分直接列出「名称 + 金额 + 占比」，不单独放提示文案
+  const catPills = cats.map((n,i)=>{
+    const v = Number(catAmt[i])||0;
+    const p = total ? (v/total*100).toFixed(1) : '0.0';
+    return `<span class="so-pill"><i style="background:${SO_COLORS[i]||'#64748b'}"></i>${n}`
+         + `<b>${soFmtY(v)}</b>元<em>${p}%</em></span>`;
+  }).join('');
   document.getElementById('soStrip').innerHTML =
     `<span class="tagname">${so.isYesterday ? '前一日' : '最近有数日'} ${String(so.asOf||'').slice(5)}</span>
      <span class="sep"></span>
-     <span>${liveN} 站在营合计 <b>${soFmtY(total)}</b> 元</span>
+     <span>${liveN} 站在营合计 <b>${soFmtY(total)}</b> 元${offNames.length ? `（${offNames.join('、')}不正常营业）` : ''}</span>
      <span class="sep"></span>
      <span>车流 <b>${soFmtN(co.carTot)}</b> 车次 · 非油 <b>${soFmtN(co.nb)}</b> 笔</span>
      <span class="sep"></span>
-     <span>品类占比 ${shares}</span>
-     <span class="sep"></span>
-     <span>点击站卡可联动全页</span>`;
+     <span class="so-cats">${catPills}</span>`;
 
   // ── 四个 KPI ──
   const kp = [
@@ -1352,7 +1381,6 @@ function renderSalesOverview(){
 
   // ── 15 站卡片 ──
   const box = document.getElementById('soStations');
-  const list = so.stations || [];
   box.innerHTML = list.map((s,idx)=>{
     const amt = Number(s.amt)||0;
     const share = total ? (amt/total*100) : 0;
@@ -1362,9 +1390,13 @@ function renderSalesOverview(){
     }).join('');
     const warn = s.warn ? '<span class="so-bad" title="单加升数越界，疑似「单数/升数」列错位"> ⚠</span>' : '';
     const alive = (amt > 0 || Number(s.carTot) > 0);
-    return `<div class="so-card${SEL===s.name?' on':''}" data-so-station="${s.name}">
+    const off = isOff(s.name);
+    // 右上角标记优先级：不正常营业 > 占比 / 无数据
+    const tag = off ? '<span class="so-off">不正常营业</span>'
+              : (alive ? ('占比 ' + share.toFixed(1) + '%') : '<span class="so-na">无数据</span>');
+    return `<div class="so-card${SEL===s.name?' on':''}${off?' off':''}" data-so-station="${s.name}">
       <div class="so-c-top"><span class="so-c-name">${s.name}</span>
-        <span class="so-c-share">${alive ? ('占比 ' + share.toFixed(1) + '%') : '<span class="so-na">无数据</span>'}</span></div>
+        <span class="so-c-share">${tag}</span></div>
       <div class="so-c-body">
         <div class="so-c-donut" id="soD${idx}"></div>
         <div class="so-c-list">${rows}
