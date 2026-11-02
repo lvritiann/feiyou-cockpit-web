@@ -1400,8 +1400,15 @@ function renderSalesOverview(){
     }]
   });
 
-  // ── 15 站卡片 ──
+  // ── 15 站卡片：仅「全公司」总览视图展示 ──
+  //    单站视图下不渲染各站分类明细（含品类金额数字与环形图），避免与单站数据混淆
   const box = document.getElementById('soStations');
+  if (SEL !== '全公司') {
+    box.innerHTML = '';
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
   box.innerHTML = list.map((s,idx)=>{
     const amt = Number(s.amt)||0;
     const share = total ? (amt/total*100) : 0;
