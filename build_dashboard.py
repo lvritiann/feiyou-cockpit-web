@@ -821,7 +821,7 @@ if (typeof echarts === 'undefined') {
     <div class="m-grid">
       <div class="m-card"><h4 id="dAmtH">品类 × 12 月 金额（元）</h4><div id="dAmt" class="m-chart" style="height:320px"></div></div>
       <div class="m-card"><h4 id="dProfH">品类 × 12 月 毛利（元）</h4><div id="dProf" class="m-chart" style="height:320px"></div></div>
-      <div class="m-card" style="grid-column:1/-1"><h4>金额 / 毛利 年度合计（万元）</h4>
+      <div class="m-card" style="grid-column:1/-1"><h4 id="dTableH">金额 / 毛利 年度合计（万元）</h4>
         <div style="overflow:auto"><table class="m-table" id="dTable"></table></div></div>
     </div>
   </div>
@@ -934,7 +934,7 @@ function renderTrafficKPI(){
     `<div class="kpi"><div class="k">${c.k}</div><div class="v">${c.v}<small>${c.u}</small></div><div class="s">${c.s}</div></div>`).join('');
 }
 function renderTraffic(){
-  const cd = _cnt(); if(!(cd.stations||[]).length) return;
+  const cd = (RANGE && RCACHE) ? _cntRange() : _cnt(); if(!(cd.stations||[]).length) return;
   const arr = cd.stations.slice().sort((a,b)=>a.tot-b.tot);
   const names = arr.map(x=>x.name);
   const gas = arr.map(x=>x.gas), die = arr.map(x=>x.die);
@@ -966,7 +966,7 @@ function renderTraffic(){
   });
 }
 function renderFuelPer(){
-  const cd = _cnt(); if(!(cd.stations||[]).length) return;
+  const cd = (RANGE && RCACHE) ? _cntRange() : _cnt(); if(!(cd.stations||[]).length) return;
   const arr = cd.stations.slice().sort((a,b)=>a.diePer-b.diePer);
   const names = arr.map(x=>x.name);
   const gap = arr.map(x=>x.gasPer), dap = arr.map(x=>x.diePer);
@@ -994,7 +994,7 @@ function renderFuelPer(){
   });
 }
 function renderConv(){
-  const cd = _cnt(); if(!(cd.stations||[]).length) return;
+  const cd = (RANGE && RCACHE) ? _cntRange() : _cnt(); if(!(cd.stations||[]).length) return;
   const avg = (cd.totals && cd.totals.conv) || 0;
   const arr = cd.stations.slice().sort((a,b)=>a.conv-b.conv);
   const names = arr.map(x=>x.name), convs = arr.map(x=>x.conv);
@@ -1101,6 +1101,23 @@ function renderRate(){
 // ---------- 图3 趋势(联动) ----------
 function renderTrend(){
   const t = document.getElementById('t3');
+  if(RANGE && RCACHE){
+    const months = RCACHE.months.labels;
+    t.textContent = (SEL === '全公司'
+        ? '各站分会计月销售趋势（含烟草金额）· 区间 ' + RANGE.from + '~' + RANGE.to
+        : SEL + ' · 月度销售趋势 · 区间 ' + RANGE.from + '~' + RANGE.to);
+    const series = DATA.stations.map((s,i)=>{
+      const isSel = (SEL===s.name), dim = (SEL!=='全公司' && !isSel);
+      return {name:s.name, type:'line', smooth:true, symbol:'none',
+        data:rfStationMonthly(s.name),
+        lineStyle:{width:isSel?3.4:1.4, color:isSel?C.hero:PALETTE[i%PALETTE.length], opacity:dim?0.18:1},
+        itemStyle:{color:isSel?C.hero:PALETTE[i%PALETTE.length], opacity:dim?0.18:1},
+        z:isSel?10:1, emphasis:{focus:'series'}};
+    });
+    mk('c3',{tooltip:baseTip, legend:{show:false}, grid:{left:60,right:24,top:18,bottom:40},
+      xAxis:cat(months), yAxis:val('元'), series});
+    return;
+  }
   t.textContent = SEL==='全公司' ? '各站分会计月销售趋势（含烟草金额）' : SEL + ' · 月度销售趋势（含烟草金额）';
   const months = DATA.company.monthLabels;
   const m = DATA.monthly.tob;
@@ -1136,6 +1153,24 @@ function renderTrend(){
 // ---------- 图4 月度（公司=公司月度；选中站=该站月度） ----------
 function renderCompany(){
   const t = document.getElementById('t4');
+  if(RANGE && RCACHE){
+    const months = RCACHE.months.labels;
+    const arr = (SEL === '全公司') ? RCACHE.months.tob : rfStationMonthly(SEL);
+    const mom = arr.map((v,i)=>{ if(i===0) return null; const p=arr[i-1]; if(!p) return null; return (v-p)/p; });
+    t.textContent = (SEL === '全公司'
+        ? '全公司月度非油金额与环比（含烟草）· 区间 ' + RANGE.from + '~' + RANGE.to
+        : SEL + ' · 月度非油金额与环比 · 区间 ' + RANGE.from + '~' + RANGE.to);
+    mk('c4',{tooltip:baseTip, legend:{data:['金额','环比'],textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600},top:2},
+      grid:Object.assign({},baseGrid,{right:56}), xAxis:cat(months),
+      yAxis:[val('元'),{type:'value',name:'环比',nameTextStyle:{color:C.mut,fontSize:10},
+        axisLine:{show:false},splitLine:{show:false},axisLabel:{color:C.mut,fontSize:11,formatter:v=>v==null?'':(v*100).toFixed(0)+'%'}}],
+      series:[
+        {name:'金额',type:'bar',data:arr,barWidth:20,itemStyle:{color:C.data,borderRadius:[4,4,0,0]}},
+        {name:'环比',type:'line',yAxisIndex:1,smooth:true,data:mom,
+          lineStyle:{width:2,color:C.accent},itemStyle:{color:C.accent}}
+      ]});
+    return;
+  }
   const months = DATA.company.monthLabels;
   if(SEL === '全公司'){
     const yoy = DATA.yoy2026;
@@ -1179,7 +1214,15 @@ function renderCompany(){
 function renderComp(){
   const t = document.getElementById('t5');
   let names, vals, profits;
-  if(SEL === '全公司'){
+  const RT = (RANGE && RCACHE) ? rfCatTotals() : null;
+  let spanWord = '全年';
+  if(RT){
+    spanWord = '区间';
+    names = (SEL === '全公司') ? DATA.composition.cats : CAT_DETAIL;
+    vals = RT.a; profits = RT.p;
+    t.textContent = (SEL === '全公司' ? '金额构成（含烟草 · 区间 ' + RANGE.from + '~' + RANGE.to + '，万元）'
+                                     : SEL + ' · 品类构成（区间 ' + RANGE.from + '~' + RANGE.to + '，万元）');
+  }else if(SEL === '全公司'){
     t.textContent = '金额构成（含烟草 · 年度累计，万元）';
     names = DATA.composition.cats; vals = DATA.composition.tob;
     // 公司级各品类毛利 = 各站该品类年度毛利合计
@@ -1200,7 +1243,7 @@ function renderComp(){
   });
   mk('c5',{tooltip:{...tipItem, formatter:p=>{
       const d=p.data;
-      return d.name+'<br>金额：'+fmt2(d.value)+' 万<br>占全年：'+Number(d.pct).toFixed(1)+'%<br>毛利：'+fmt2(d.profit)+' 万<br>毛利率：'+Number(d.rate).toFixed(2)+'%';
+      return d.name+'<br>金额：'+fmt2(d.value)+' 万<br>占'+spanWord+'：'+Number(d.pct).toFixed(1)+'%<br>毛利：'+fmt2(d.profit)+' 万<br>毛利率：'+Number(d.rate).toFixed(2)+'%';
     }},
     legend:{orient:'vertical',left:'left',textStyle:{color:'#dbe3f0',fontSize:12,fontWeight:600}},
     color:MODAL_PALETTE,
@@ -1216,7 +1259,17 @@ function renderComp(){
 function renderDual(){
   const t = document.getElementById('t6');
   let d;
-  if(SEL === '全公司'){
+  const RT = (RANGE && RCACHE) ? rfCatTotals() : null;
+  if(RT){
+    // 沿用现有定义：不含烟草 = 汽车用品 + 便利百货（不含咖啡）
+    const nonA = (RT.a[0]+RT.a[1]), nonP = (RT.p[0]+RT.p[1]);
+    const tobA = RT.a.reduce((s,v)=>s+v,0), tobP = RT.p.reduce((s,v)=>s+v,0);
+    d = { cats:['金额','毛利'],
+          non:[Math.round(nonA*100)/100, Math.round(nonP*100)/100],
+          tob:[Math.round(tobA*100)/100, Math.round(tobP*100)/100] };
+    t.textContent = (SEL === '全公司' ? '双口径对比（金额 / 毛利，万元 · 区间 '+RANGE.from+'~'+RANGE.to+'）'
+                                     : SEL + ' · 双口径对比（区间，万元）');
+  }else if(SEL === '全公司'){
     t.textContent = '双口径对比（金额 / 毛利，万元）';
     d = DATA.dual;
   }else{
@@ -1236,15 +1289,24 @@ function renderDual(){
 
 // ---------- 近30天日变化(联动) ----------
 function renderDaily30(){
-  const d = DATA.daily30 || {dates:[], amount:{}, profit:{}};
+  let d, key;
+  if(RANGE && RCACHE){
+    key = (SEL === '全公司') ? '合计' : SEL;
+    const r = rfDaily(SEL === '全公司' ? '全公司' : SEL);
+    d = { dates: r.dates, amount: {}, profit: {} };
+    d.amount[key] = r.amt; d.profit[key] = r.prf;
+  }else{
+    d = DATA.daily30 || {dates:[], amount:{}, profit:{}};
+    key = SEL === '全公司' ? '合计' : SEL;
+  }
   if(!d.dates.length){ return; }
-  const key = SEL === '全公司' ? '合计' : SEL;
   const amtArr = d.amount[key] || [];
   const profArr = d.profit[key] || [];
   const t7 = document.getElementById('t7');
   const t8 = document.getElementById('t8');
-  t7.textContent = '近30天日变化 · 非油销售额（含烟草）' + (SEL==='全公司' ? '' : ' · ' + SEL);
-  t8.textContent = '近30天日变化 · 非油毛利（含烟草）' + (SEL==='全公司' ? '' : ' · ' + SEL);
+  const head = RANGE ? ('日变化 · 区间 ' + RANGE.from + '~' + RANGE.to) : '近30天日变化';
+  t7.textContent = head + ' · 非油销售额（含烟草）' + (SEL==='全公司' ? '' : ' · ' + SEL);
+  t8.textContent = head + ' · 非油毛利（含烟草）' + (SEL==='全公司' ? '' : ' · ' + SEL);
   // 7日均线
   const ma7 = arr => arr.map((_,i)=>{
     if(i<6) return null;
@@ -1324,9 +1386,20 @@ function renderDetail(){
   const sub = document.getElementById('detailSub');
   const aH = document.getElementById('dAmtH');
   const pH = document.getElementById('dProfH');
-  const months = DATA.company.monthLabels;
+  let months = DATA.company.monthLabels;
   const amt = {}, prof = {};
-  if (isCo) {
+  if (RANGE && RCACHE) {
+    months = RCACHE.months.labels;
+    CAT_DETAIL.forEach((c,i)=>{ amt[c] = rfCatMonthly(i, false); prof[c] = rfCatMonthly(i, true); });
+    const sc = isCo ? '全公司' : SEL;
+    const n = months.length;
+    t.textContent = sc + ' · 品类构成与明细 · 区间 ' + RANGE.from + '~' + RANGE.to;
+    sub.textContent = '5 品类 × ' + n + ' 个会计月 金额/毛利堆叠（' + (isCo ? '公司合计' : SEL) + '）、区间占比、区间合计表';
+    aH.textContent = '品类 × ' + n + ' 月 金额（元' + (isCo ? '，公司合计' : '') + '）';
+    pH.textContent = '品类 × ' + n + ' 月 毛利（元' + (isCo ? '，公司合计' : '') + '）';
+    const th = document.getElementById('dTableH');
+    if (th) th.textContent = '金额 / 毛利 区间合计（万元）· ' + RANGE.from + '~' + RANGE.to;
+  } else if (isCo) {
     t.textContent = '全公司 · 品类构成与明细';
     sub.textContent = '5 品类 × 12 会计月 金额/毛利堆叠（公司合计）、年度构成、合计表';
     aH.textContent = '品类 × 12 月 金额（元，公司合计）';
@@ -1351,6 +1424,10 @@ function renderDetail(){
     }
   }
   // 各品类全年合计 & 占总额比例（用于图例标注 + 合计表）
+  if (!(RANGE && RCACHE)) {
+    const th0 = document.getElementById('dTableH');
+    if (th0) th0.textContent = '金额 / 毛利 年度合计（万元）';
+  }
   const annA = {}, annP = {};
   CAT_DETAIL.forEach(c=>{ annA[c]=sum12(amt[c]); annP[c]=sum12(prof[c]); });
   const totA = CAT_DETAIL.reduce((s,c)=>s+annA[c],0) || 1;
@@ -1642,6 +1719,7 @@ function renderRangeFilter(){
     return;
   }
 
+  rfBuildRange();               // 构建区间缓存，供下方图表联动使用
   const A = rfPick(RANGE.from, RANGE.to);
   if(!A || A.daysData === 0){
     meta.innerHTML = `<span>当前视角 <b>${scope}</b></span>`
@@ -1658,7 +1736,7 @@ function renderRangeFilter(){
   meta.innerHTML = `<span>当前视角 <b>${scope}</b></span>`
     + `<span>区间 <b>${RANGE.from}</b> ~ <b>${RANGE.to}</b>（共 <b>${A.daysTotal}</b> 天）</span>`
     + `<span>有数据 <b class="hl">${A.daysData}</b> 天 → 日均按此计算</span>`
-    + `<span class="hl">下方图表暂未接入区间口径（下一步）</span>`
+    + `<span class="hl">任务排行/完成率/毛利排行/毛利率 四图仍为年度口径</span>`
     + (offS ? `<span class="hl">该站标注为不正常营业</span>` : '');
 
   const R = (cls, color, name, val, extra) =>
@@ -1733,6 +1811,164 @@ document.querySelectorAll('#rfQuick .rf-q').forEach(el=>{
     document.getElementById('rfGo').click();
   });
 });
+
+// ══════════════════════════════════════════════════════════
+// 阶段C · 区间口径数据层（RANGE 激活时供下方图表使用）
+//   RCACHE 结构与用途：
+//     bySt[站]        {a[5],p[5],c[7],days}      各站区间聚合
+//     co              {a[5],p[5],c[7]}           全公司区间聚合
+//     dailyBySt[站]   {amt[],prf[]}              各站逐日（与 dates 对齐）
+//     dailyCo         {amt[],prf[]}              公司逐日
+//     dates[]         区间内所有日期
+//     months          {labels[],tob[],non[]}     公司会计月序列（不含烟草=汽+便）
+//     stCatMonth[站]  [[5]per会计月]             各站各月各品类金额
+//     stCatPrf[站]    同上（毛利）
+//   口径沿用现有定义：不含烟草 = 汽车用品 + 便利百货（沿用图表数据源块2，不含咖啡）
+// ══════════════════════════════════════════════════════════
+let RCACHE = null;
+
+function rfAmKey(ds){
+  const s = rfAcctMonth(rfS2d(ds)).start;
+  return s.getFullYear() * 12 + s.getMonth();
+}
+
+function rfBuildRange(){
+  const D = DAILY;
+  if(!D || !RANGE) return null;
+  const key = RANGE.from + '|' + RANGE.to;
+  if(RCACHE && RCACHE.key === key) return RCACHE;
+
+  const stNames = Object.keys(D.stations);
+  const baseKey = rfAmKey(D.dates[0]);
+  const bySt = {}, dailyBySt = {}, stCatMonth = {}, stCatPrf = {};
+  stNames.forEach(nm=>{
+    bySt[nm] = { a:[0,0,0,0,0], p:[0,0,0,0,0], c:[0,0,0,0,0,0,0], days:0 };
+    dailyBySt[nm] = { amt:[], prf:[] };
+    stCatMonth[nm] = {}; stCatPrf[nm] = {};
+  });
+  const co = { a:[0,0,0,0,0], p:[0,0,0,0,0], c:[0,0,0,0,0,0,0] };
+  const dates = [], dailyCo = { amt:[], prf:[] };
+  const mTob = {}, mNon = {};
+
+  for(let i = 0; i < D.dates.length; i++){
+    const ds = D.dates[i];
+    if(ds < RANGE.from || ds > RANGE.to) continue;
+    const mi = rfAmKey(ds) - baseKey;
+    if(mTob[mi] === undefined){ mTob[mi] = 0; mNon[mi] = 0; }
+    dates.push(ds);
+    let coA = 0, coP = 0;
+    for(let j = 0; j < stNames.length; j++){
+      const nm = stNames[j];
+      const v = D.stations[nm], a = v.a[i] || [], p = v.p[i] || [], c = v.c[i] || [];
+      const S = bySt[nm];
+      let s = 0, sp = 0;
+      for(let x = 0; x < 5; x++){
+        const av = a[x]||0, pv = p[x]||0;
+        S.a[x] += av; S.p[x] += pv; co.a[x] += av; co.p[x] += pv;
+        s += av; sp += pv;
+        if(!stCatMonth[nm][mi]) { stCatMonth[nm][mi] = [0,0,0,0,0]; stCatPrf[nm][mi] = [0,0,0,0,0]; }
+        stCatMonth[nm][mi][x] += av;
+        stCatPrf[nm][mi][x] += pv;
+      }
+      for(let x = 0; x < 7; x++){ const cv = c[x]||0; S.c[x] += cv; co.c[x] += cv; }
+      if(s > 0) S.days++;
+      dailyBySt[nm].amt.push(Math.round(s*100)/100);
+      dailyBySt[nm].prf.push(Math.round(sp*100)/100);
+      coA += s; coP += sp;
+    }
+    dailyCo.amt.push(Math.round(coA*100)/100);
+    dailyCo.prf.push(Math.round(coP*100)/100);
+    mTob[mi] += coA;
+  }
+
+  // 会计月序列（按序号排序）
+  const mis = Object.keys(mTob).map(Number).sort((a,b)=>a-b);
+  const months = { labels:[], tob:[], non:[] };
+  mis.forEach(mi=>{
+    months.labels.push((mi + 1) + '月');
+    months.tob.push(Math.round(mTob[mi]*100)/100);
+    months.non.push(0);
+  });
+
+  // 不含烟草（汽+便）按站×月补算
+  const nonByMonth = {};
+  stNames.forEach(nm=>{
+    Object.keys(stCatMonth[nm]).forEach(k=>{
+      const mi = Number(k), arr = stCatMonth[nm][mi];
+      nonByMonth[mi] = (nonByMonth[mi] || 0) + (arr[0] || 0) + (arr[1] || 0);
+    });
+  });
+  months.non = mis.map(mi => Math.round((nonByMonth[mi] || 0) * 100) / 100);
+
+  RCACHE = { key: key, dates: dates, bySt: bySt, co: co, dailyBySt: dailyBySt,
+             dailyCo: dailyCo, months: months, mis: mis,
+             stCatMonth: stCatMonth, stCatPrf: stCatPrf, baseKey: baseKey };
+  console.log('[区间口径] 已构建 '+dates.length+' 天 / '+stNames.length+' 站');
+  return RCACHE;
+}
+
+// 供 c11/c12/c13 使用的「counts 形状」对象
+function _cntRange(){
+  const R = RCACHE;
+  const arr = Object.keys(R.bySt).map(nm=>{
+    const S = R.bySt[nm], c = S.c;
+    const gas = c[1], die = c[0], gasL = c[6], dieL = c[5];
+    const nb = c[2] + c[3] + c[4];
+    const tot = gas + die;
+    return { name: nm, gas: gas, die: die, tot: tot,
+             gasL: gasL, dieL: dieL, vol: gasL + dieL,
+             gasPer: gas ? Math.round(gasL/gas*100)/100 : 0,
+             diePer: die ? Math.round(dieL/die*100)/100 : 0,
+             huo: c[2], bian: c[3], cof: c[4], nb: nb,
+             conv: tot ? Math.round(nb/tot*10000)/100 : 0,
+             amt: Math.round(S.a.reduce((x,y)=>x+y,0)*100)/100,
+             amtPer: tot ? Math.round(S.a.reduce((x,y)=>x+y,0)/tot*100)/100 : 0 };
+  });
+  const C = R.co.c, gasT = C[1], dieT = C[0], nbT = C[2]+C[3]+C[4], totT = gasT + dieT;
+  return { totals: { gas: gasT, die: dieT, tot: totT, gasL: C[6], dieL: C[5],
+                     nb: nbT, conv: totT ? Math.round(nbT/totT*10000)/100 : 0,
+                     amt: Math.round(R.co.a.reduce((x,y)=>x+y,0)*100)/100 },
+           stations: arr };
+}
+
+// 供 c7/c8 使用的日序列
+function rfDaily(key){
+  const R = RCACHE;
+  if(key === '全公司' || key === '合计') return { dates: R.dates, amt: R.dailyCo.amt, prf: R.dailyCo.prf };
+  const d = R.dailyBySt[key];
+  return d ? { dates: R.dates, amt: d.amt, prf: d.prf } : { dates: R.dates, amt: [], prf: [] };
+}
+
+// 供 c5/c6 使用的「品类区间合计（万元）」
+function rfCatTotals(){
+  const R = RCACHE;
+  const isCo = (SEL === '全公司');
+  const S = isCo ? R.co : R.bySt[SEL];
+  if(!S) return null;
+  return { a: S.a.map(v=>Math.round(v/1e2)/100), p: S.p.map(v=>Math.round(v/1e2)/100) };
+}
+
+// 供 c3 使用的「各站分会计月金额（元）」
+function rfStationMonthly(nm){
+  const R = RCACHE;
+  return R.mis.map(mi=>{
+    const arr = R.stCatMonth[nm] && R.stCatMonth[nm][mi];
+    return arr ? Math.round(arr.reduce((x,y)=>x+y,0)*100)/100 : 0;
+  });
+}
+
+// 供明细模块使用：某品类在区间内按会计月的金额/毛利（全公司或单站）
+function rfCatMonthly(catIdx, isProfit){
+  const R = RCACHE;
+  const isCo = (SEL === '全公司');
+  const src = isProfit ? R.stCatPrf : R.stCatMonth;
+  return R.mis.map(mi=>{
+    let s = 0;
+    if(isCo){ for(const nm in src){ const arr = src[nm][mi]; if(arr) s += arr[catIdx]||0; } }
+    else { const arr = src[SEL] && src[SEL][mi]; if(arr) s = arr[catIdx]||0; }
+    return Math.round(s*100)/100;
+  });
+}
 
 // ---------- 渲染总入口 ----------
 function renderAll(){
