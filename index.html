@@ -207,6 +207,62 @@ if (typeof echarts === 'undefined') {
     .so-c-body{gap:8px}
     .so-c-donut{width:72px;height:72px}
   }
+
+  /* ══════════ 时间筛选（任意区间查询 · 独立模块） ══════════ */
+  .rf{margin:2px 0 20px}
+  .rf-box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+  .rf-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+  .rf-bar .lbl{font-size:12.5px;color:var(--ink);font-weight:700;letter-spacing:.01em}
+  .rf-in{background:var(--bg);border:1px solid var(--line);border-radius:9px;color:var(--ink);
+    font-size:13px;padding:7px 10px;font-family:inherit;color-scheme:dark}
+  .rf-in:focus{outline:none;border-color:var(--data2)}
+  .rf-tilde{color:var(--faint);font-size:12px}
+  .rf-btn{border:1px solid var(--data);background:var(--data);color:#fff;border-radius:9px;
+    padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;font-family:inherit}
+  .rf-btn:hover{filter:brightness(1.12)}
+  .rf-btn.ghost{background:transparent;border-color:var(--line);color:var(--mut);font-weight:600}
+  .rf-btn.ghost:hover{color:var(--ink);border-color:var(--data2);filter:none}
+  .rf-btn:disabled{opacity:.55;cursor:not-allowed;filter:none}
+  .rf-quick{display:flex;gap:6px;flex-wrap:wrap;margin-left:2px}
+  .rf-q{padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);
+    color:var(--mut);font-size:11.5px;cursor:pointer;user-select:none;transition:.15s}
+  .rf-q:hover{color:var(--data);border-color:var(--data2)}
+  .rf-q.on{background:var(--data);border-color:var(--data);color:#fff;font-weight:700}
+  .rf-meta{margin-top:10px;font-size:11.5px;color:var(--faint);display:flex;flex-wrap:wrap;gap:5px 18px}
+  .rf-meta b{color:var(--mut);font-weight:700}
+  .rf-meta .hl{color:var(--accent);font-weight:700}
+  .rf-head{display:flex;gap:10px;padding:0 2px 6px;margin-top:12px;
+    border-bottom:1px solid var(--line);font-size:11px;color:var(--faint)}
+  .rf-head .nm{flex:1}
+  .rf-head .val{width:132px;text-align:right}
+  .rf-head .day{width:122px;text-align:right}
+  .rf-head .pct{width:56px;text-align:right}
+  .rf-row{display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:13px;
+    border-bottom:1px solid rgba(35,47,74,.6)}
+  .rf-row:last-child{border-bottom:none}
+  .rf-row i{width:9px;height:9px;border-radius:3px;flex:none}
+  .rf-row .nm{flex:1;min-width:0;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rf-row .val{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);width:132px;text-align:right}
+  .rf-row .day{font-variant-numeric:tabular-nums;color:var(--mut);width:122px;text-align:right}
+  .rf-row .pct{color:var(--faint);width:56px;text-align:right;font-size:12px}
+  .rf-row.tot{background:rgba(251,191,36,.055)}
+  .rf-row.tot .nm,.rf-row.tot .val{color:var(--accent);font-weight:800}
+  .rf-row.sub{display:none}
+  .rf.open .rf-row.sub{display:flex}
+  .rf-row.sub .nm{padding-left:19px;font-size:12px;color:var(--mut)}
+  .rf-row.sub .val{font-weight:600;color:var(--txt);font-size:12.5px}
+  .rf-row.sub .day{font-size:11.5px}
+  .rf-tog{cursor:pointer;color:var(--data2);font-size:11px;user-select:none;padding:1px 5px;
+    border:1px solid var(--line);border-radius:5px;margin-left:6px}
+  .rf-tog:hover{color:var(--accent);border-color:var(--accent)}
+  .rf-empty{padding:16px 2px;font-size:12.5px;color:var(--faint);text-align:center}
+  .rf-err{padding:14px 2px;font-size:12.5px;color:#fca5a5;line-height:1.7}
+  @media(max-width:760px){
+    .rf-row .val,.rf-head .val{width:104px;font-size:12.5px}
+    .rf-row .day,.rf-head .day{width:86px;font-size:11.5px}
+    .rf-row .pct,.rf-head .pct{width:44px}
+    .rf-box{padding:12px 12px}
+  }
 </style>
 </head>
 <body>
@@ -260,6 +316,29 @@ if (typeof echarts === 'undefined') {
       </div>
     </div>
     <div class="so-stations" id="soStations"></div>
+  </section>
+
+  <!-- ── 时间筛选（任意区间查询 · 独立模块，改动不影响现有图表） ── -->
+  <section class="rf" id="rf">
+    <div class="rf-box">
+      <div class="rf-bar">
+        <span class="lbl">时间筛选 · 任意区间查询</span>
+        <input type="date" class="rf-in" id="rfFrom">
+        <span class="rf-tilde">~</span>
+        <input type="date" class="rf-in" id="rfTo">
+        <button class="rf-btn" id="rfGo">查询</button>
+        <button class="rf-btn ghost" id="rfReset">重置</button>
+        <div class="rf-quick" id="rfQuick">
+          <span class="rf-q" data-d="7">近7天</span>
+          <span class="rf-q" data-d="30">近30天</span>
+          <span class="rf-q" data-d="90">近90天</span>
+          <span class="rf-q" data-m="0">本会计月</span>
+          <span class="rf-q" data-m="1">上会计月</span>
+        </div>
+      </div>
+      <div class="rf-meta" id="rfMeta"></div>
+      <div id="rfBody"></div>
+    </div>
   </section>
 
   <div class="grid">
@@ -1045,10 +1124,178 @@ function renderSalesOverview(){
   });
 }
 
+// ---------- 时间筛选（任意区间查询 · 独立模块） ----------
+// 数据源：data_daily.json（AirScript v3.8+ 生成，懒加载，首次查询才拉取）
+// 口径：合计=区间内逐日累加；日均=合计÷有数据天数；展示 4 品类（烟草=零售+批发）
+// 与现有图表的关系：默认 RANGE=null 时完全不影响；启用后由各图表自行判断是否改口径
+let DAILY = null;
+let RANGE = null;                 // {from,to}；null = 未启用（图表走年度口径）
+
+const rfY = v => (v==null||isNaN(v)) ? '—' : Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const rfD2s = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const rfS2d = s => { const p = s.split('-').map(Number); return new Date(p[0], p[1]-1, p[2]); };
+
+// 会计月边界（26 日 ~ 次月 25 日）
+function rfAcctMonth(d){
+  const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
+  if(day >= 26) return { start: new Date(y, m, 26),     end: new Date(y, m+1, 25) };
+  return                { start: new Date(y, m-1, 26), end: new Date(y, m, 25) };
+}
+
+async function rfEnsureDaily(){
+  if(DAILY) return DAILY;
+  const r = await fetch('data_daily.json', {cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  DAILY = await r.json();
+  console.log('[时间筛选] data_daily.json 已加载：'+DAILY.dates.length+' 天 / '+Object.keys(DAILY.stations).length+' 站');
+  return DAILY;
+}
+
+// 区间聚合：全公司=15 站求和；单站=该站
+function rfPick(from, to){
+  const D = DAILY; if(!D) return null;
+  const names = (SEL === '全公司') ? Object.keys(D.stations) : [SEL];
+  const amt = [0,0,0,0,0], prf = [0,0,0,0,0], cnt = [0,0,0,0,0,0,0];
+  let daysData = 0;
+  const daysTotal = Math.round((rfS2d(to) - rfS2d(from)) / 86400000) + 1;
+  for(let i = 0; i < D.dates.length; i++){
+    const ds = D.dates[i];
+    if(ds < from || ds > to) continue;
+    let daySum = 0;
+    for(let j = 0; j < names.length; j++){
+      const v = D.stations[names[j]]; if(!v) continue;
+      const a = v.a[i] || [], p = v.p[i] || [], c = v.c[i] || [];
+      for(let k = 0; k < 5; k++){ amt[k] += a[k]||0; prf[k] += p[k]||0; }
+      for(let k = 0; k < 7; k++){ cnt[k] += c[k]||0; }
+      daySum += (a[0]||0)+(a[1]||0)+(a[2]||0)+(a[3]||0)+(a[4]||0);
+    }
+    if(daySum > 0) daysData++;
+  }
+  return { amt: amt, prf: prf, cnt: cnt, daysTotal: daysTotal, daysData: daysData };
+}
+
+function renderRangeFilter(){
+  const sec = document.getElementById('rf'); if(!sec) return;
+  const meta = document.getElementById('rfMeta'), body = document.getElementById('rfBody');
+  const fEl = document.getElementById('rfFrom'), tEl = document.getElementById('rfTo');
+  const scope = (SEL === '全公司') ? '全公司（15 站合计）' : SEL;
+  const offS = (SEL !== '全公司') && (SO_INACTIVE.indexOf(SEL) >= 0);
+
+  // 首次进入时给个默认区间（近 30 天），不自动查询
+  if(!fEl.value || !tEl.value){
+    const now = new Date();
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const from = new Date(to.getTime() - 29 * 86400000);
+    if(!fEl.value) fEl.value = rfD2s(from);
+    if(!tEl.value) tEl.value = rfD2s(to);
+  }
+
+  if(!RANGE){
+    meta.innerHTML = `<span>当前视角 <b>${scope}</b></span>`
+      + `<span>未启用区间 · 下方图表按年度口径</span>`
+      + (offS ? `<span class="hl">该站标注为不正常营业</span>` : '');
+    body.innerHTML = `<div class="rf-empty">选择起止日期后点「查询」，这里显示该区间的销售合计与日均（含 4 个细分品类）</div>`;
+    document.querySelectorAll('#rfQuick .rf-q').forEach(e => e.classList.remove('on'));
+    return;
+  }
+
+  const A = rfPick(RANGE.from, RANGE.to);
+  if(!A || A.daysData === 0){
+    meta.innerHTML = `<span>当前视角 <b>${scope}</b></span>`
+      + `<span>区间 <b>${RANGE.from}</b> ~ <b>${RANGE.to}</b></span>`
+      + `<span class="hl">区间内无数据</span>`;
+    body.innerHTML = `<div class="rf-empty">所选区间内没有销售数据，请调整起止日期后重新查询</div>`;
+    return;
+  }
+
+  const tot = A.amt.reduce((s,v)=>s+v, 0);
+  const avg = v => A.daysData ? v / A.daysData : 0;
+  const pct = v => tot ? (v / tot * 100) : 0;
+
+  meta.innerHTML = `<span>当前视角 <b>${scope}</b></span>`
+    + `<span>区间 <b>${RANGE.from}</b> ~ <b>${RANGE.to}</b>（共 <b>${A.daysTotal}</b> 天）</span>`
+    + `<span>有数据 <b class="hl">${A.daysData}</b> 天 → 日均按此计算</span>`
+    + `<span class="hl">下方图表暂未接入区间口径（下一步）</span>`
+    + (offS ? `<span class="hl">该站标注为不正常营业</span>` : '');
+
+  const R = (cls, color, name, val, extra) =>
+      `<div class="rf-row ${cls}"><i style="background:${color}"></i>`
+    + `<span class="nm">${name}${extra || ''}</span>`
+    + `<span class="val">${rfY(val)}</span>`
+    + `<span class="day">${rfY(avg(val))}</span>`
+    + `<span class="pct">${pct(val).toFixed(1)}%</span></div>`;
+
+  const tob = A.amt[2] + A.amt[3];
+  body.innerHTML =
+      `<div class="rf-head"><span class="nm">项目（元）</span><span class="val">区间合计</span>`
+    + `<span class="day">日均</span><span class="pct">占比</span></div>`
+    + R('tot', 'var(--accent)', '非油品销售总额', tot)
+    + R('', SO_COLORS[0], '汽车用品', A.amt[0])
+    + R('', SO_COLORS[1], '便利店商品', A.amt[1])
+    + R('', SO_COLORS[2], '烟草', tob, '<span class="rf-tog" id="rfTob">展开</span>')
+    + R('sub', SO_COLORS[2], '其中：烟草零售', A.amt[2])
+    + R('sub', SO_COLORS[3], '其中：烟草批发', A.amt[3])
+    + R('', SO_COLORS[4], '咖啡', A.amt[4]);
+
+  const tg = document.getElementById('rfTob');
+  if(tg) tg.addEventListener('click', ()=>{
+    const on = sec.classList.toggle('open');
+    tg.textContent = on ? '收起' : '展开';
+  });
+}
+
+// 交互绑定
+document.getElementById('rfGo').addEventListener('click', async ()=>{
+  const f = document.getElementById('rfFrom').value, t = document.getElementById('rfTo').value;
+  if(!f || !t){ alert('请先选择起止日期'); return; }
+  if(f > t){ alert('开始日期不能晚于结束日期'); return; }
+  const btn = document.getElementById('rfGo');
+  btn.disabled = true; btn.textContent = '查询中…';
+  try{
+    await rfEnsureDaily();
+    RANGE = { from: f, to: t };
+    renderAll();
+  }catch(e){
+    document.getElementById('rfBody').innerHTML =
+      '<div class="rf-err">⚠️ 日级明细加载失败：'+e+'<br>请确认 data_daily.json 已由 AirScript v3.8 及以上版本生成并推送。</div>';
+  }finally{
+    btn.disabled = false; btn.textContent = '查询';
+  }
+});
+
+document.getElementById('rfReset').addEventListener('click', ()=>{
+  RANGE = null;
+  renderAll();
+});
+
+document.querySelectorAll('#rfQuick .rf-q').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    const fEl = document.getElementById('rfFrom'), tEl = document.getElementById('rfTo');
+    const now = new Date();
+    let from, to;
+    if(el.dataset.d){
+      to = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      from = new Date(to.getTime() - (Number(el.dataset.d) - 1) * 86400000);
+    }else{
+      const cur = rfAcctMonth(now);
+      if(Number(el.dataset.m) === 0){ from = cur.start; to = cur.end; }
+      else{
+        const prevEnd = new Date(cur.start.getTime() - 86400000);
+        const prev = rfAcctMonth(prevEnd);
+        from = prev.start; to = prev.end;
+      }
+    }
+    fEl.value = rfD2s(from); tEl.value = rfD2s(to);
+    document.querySelectorAll('#rfQuick .rf-q').forEach(e => e.classList.toggle('on', e === el));
+    document.getElementById('rfGo').click();
+  });
+});
+
 // ---------- 渲染总入口 ----------
 function renderAll(){
   charts.forEach(c=>c.dispose()); charts.length=0;
   renderSalesOverview();
+  renderRangeFilter();
   renderKPI(); renderTrafficKPI(); renderRank(); renderRate(); renderRank2(); renderTrend(); renderDaily30(); renderCompany(); renderComp(); renderDual();
   renderTraffic(); renderFuelPer(); renderConv();
   renderDetail();
@@ -1228,5 +1475,5 @@ document.querySelectorAll('#yearbar .ytab').forEach(t=>{
 });
 boot();
 </script>
-<script src="hub-home.js" defer></script><!-- HUB-HOME v1 --></body>
+</body>
 </html>
